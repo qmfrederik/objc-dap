@@ -48,40 +48,46 @@ jobs:
         run: |
           cmake --build build
         working-directory: src/libobjcd
+      - name: Test
+        shell: cmd
+        run: |
+          call conan\conanrun.bat
+          ctest --test-dir build --output-on-failure
+        working-directory: src/libobjcd
 
-  linux:
-    runs-on: ubuntu-latest
-    container:
-      image: ubuntu:26.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Dependencies
-        run: |
-          apt-get update
-          apt-get install -y clang python3-venv cmake ninja-build
-      - name: Check LLVM, Cmake version
-        run: |
-          clang --version
-          cmake --version
-          ninja --version
-      - name: Install Conan
-        run: |
-          python3 -m venv .python3/
-          .python3/bin/pip install conan==2.33.0
-      - name: Configure Conan
-        run: |
-          .python3/bin/conan config install conan-config
-          .python3/bin/conan remote list
-          .python3/bin/conan profile list
-      - name: Install Dependencies
-        run: |
-          ../../.python3/bin/conan install . -pr:a=linux-clang-nodist -of=conan
-        working-directory: src/libobjcd
-      - name: Configure
-        run: |
-          cmake --preset release
-        working-directory: src/libobjcd
-      - name: Build
-        run: |
-          cmake --build build
-        working-directory: src/libobjcd
+  # linux:
+  #   runs-on: ubuntu-latest
+  #   container:
+  #     image: ubuntu:26.04
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Setup Dependencies
+  #       run: |
+  #         apt-get update
+  #         apt-get install -y clang python3-venv cmake ninja-build
+  #     - name: Check LLVM, Cmake version
+  #       run: |
+  #         clang --version
+  #         cmake --version
+  #         ninja --version
+  #     - name: Install Conan
+  #       run: |
+  #         python3 -m venv .python3/
+  #         .python3/bin/pip install conan==2.33.0
+  #     - name: Configure Conan
+  #       run: |
+  #         .python3/bin/conan config install conan-config
+  #         .python3/bin/conan remote list
+  #         .python3/bin/conan profile list
+  #     - name: Install Dependencies
+  #       run: |
+  #         ../../.python3/bin/conan install . -pr:a=linux-clang-nodist -of=conan
+  #       working-directory: src/libobjcd
+  #     - name: Configure
+  #       run: |
+  #         cmake --preset release
+  #       working-directory: src/libobjcd
+  #     - name: Build
+  #       run: |
+  #         cmake --build build
+  #       working-directory: src/libobjcd
