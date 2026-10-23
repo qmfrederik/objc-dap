@@ -1,0 +1,29 @@
+{
+    "version": 4,
+    "vendor": {
+        "conan": {}
+    },
+    "include": [
+        "conan/CMakePresets.json"
+    ],
+    "configurePresets": [
+        {
+            "name": "release",
+            "displayName": "release",
+            "inherits": "conan-release",
+            "binaryDir": "${sourceDir}/build",
+            "toolchainFile": "${sourceDir}/conan/conan_toolchain.cmake",
+            "cacheVariables": {
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "inherits": "conan-release"
+        }
+    ]
+}
