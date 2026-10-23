@@ -25,5 +25,15 @@
             "configurePreset": "release",
             "inherits": "conan-release"
         }
+    ],
+    "testPresets": [
+        {
+            "name": "release",
+            "configurePreset": "release",
+            "inherits": "conan-release",
+            "output": {
+                "outputOnFailure": true
+            }
+        }
     ]
 }
