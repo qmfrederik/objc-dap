@@ -1,5 +1,9 @@
 #include "objcd.h"
+#include "objcd-dap.h"
 #include <Foundation/Foundation.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <string.h>
 
 #ifdef _WIN32
 static BOOL is_readable(const void* p)
@@ -56,4 +60,38 @@ BOOL is_objc_object(void* obj)
         return NO;
     Class cls = object_getClass((id)obj);
     return cls && is_readable(cls) && is_registered_class(cls);
+}
+
+objcd_dap_variable* get_objc_variable(void* obj)
+{
+    if (!is_objc_object(obj))
+        return NULL;
+    objcd_dap_variable* var = (objcd_dap_variable*)calloc(1, sizeof *var);
+    if (!var)
+        return NULL;
+    @autoreleasepool {
+        id o = (id)obj;
+        const char* description = NULL;
+        // -description runs arbitrary target code and may throw.
+        @try {
+            description = [[o description] UTF8String];
+        } @catch (id) {
+        }
+        var->value = _strdup(description ? description : "");
+        var->type = _strdup(class_getName(object_getClass(o)));
+    }
+    char address[2 + 2 * sizeof(uintptr_t) + 1];
+    snprintf(address, sizeof address, "0x%" PRIxPTR, (uintptr_t)obj);
+    var->memory_reference = _strdup(address);
+    return var;
+}
+
+void free_objc_variable(objcd_dap_variable* var)
+{
+    if (!var)
+        return;
+    free((void*)var->value);
+    free((void*)var->type);
+    free((void*)var->memory_reference);
+    free(var);
 }
