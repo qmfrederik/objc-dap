@@ -17,6 +17,8 @@ jobs:
             image: windows-2022
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Check LLVM, Cmake version
         # We need at least LLVM 18.0 for proper Objective C support.  Visual Studio 2022 ships with LLVM 17,
         # so we need to make sure we pick up clang from C:\Program Files\LLVM\bin\
@@ -36,58 +38,36 @@ jobs:
           conan config install conan-config
           conan remote list
           conan profile list
-      - name: Install Dependencies
+      - name: Install libobjcd Dependencies
         run: |
           conan install . -pr:a=windows-clang-vs2022 -of=conan
         working-directory: src/libobjcd
-      - name: Configure
+      - name: Configure libobjcd
         run: |
           cmake --preset release
         working-directory: src/libobjcd
-      - name: Build
+      - name: Build libobjcd
         run: |
           cmake --build build
         working-directory: src/libobjcd
-      - name: Test
+      - name: Test libobjcd
         shell: cmd
         run: |
           call conan\conanrun.bat
           ctest --test-dir build --output-on-failure
         working-directory: src/libobjcd
-
-  # linux:
-  #   runs-on: ubuntu-latest
-  #   container:
-  #     image: ubuntu:26.04
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - name: Setup Dependencies
-  #       run: |
-  #         apt-get update
-  #         apt-get install -y clang python3-venv cmake ninja-build
-  #     - name: Check LLVM, Cmake version
-  #       run: |
-  #         clang --version
-  #         cmake --version
-  #         ninja --version
-  #     - name: Install Conan
-  #       run: |
-  #         python3 -m venv .python3/
-  #         .python3/bin/pip install conan==2.33.0
-  #     - name: Configure Conan
-  #       run: |
-  #         .python3/bin/conan config install conan-config
-  #         .python3/bin/conan remote list
-  #         .python3/bin/conan profile list
-  #     - name: Install Dependencies
-  #       run: |
-  #         ../../.python3/bin/conan install . -pr:a=linux-clang-nodist -of=conan
-  #       working-directory: src/libobjcd
-  #     - name: Configure
-  #       run: |
-  #         cmake --preset release
-  #       working-directory: src/libobjcd
-  #     - name: Build
-  #       run: |
-  #         cmake --build build
-  #       working-directory: src/libobjcd
+      - name: Test objc-dap
+        run: |
+          dotnet restore
+          dotnet test
+        working-directory: src
+      - name: Test objc-dap
+        run: |
+          dotnet publish -c Release
+          .\bin\Release\net10.0\win-x64\publish\objc-dap.exe --version
+        working-directory: src/objc-dap
+      - name: Publish artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: objc-dap
+          path: src/objc-dap/bin/Release/net10.0/win-x64/publish/objc-dap.exe

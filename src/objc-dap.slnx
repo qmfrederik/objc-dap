@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="objc-dap/objc-dap.csproj" />
+  <Project Path="objc-dap.Tests/objc-dap.Tests.csproj" />
+</Solution>

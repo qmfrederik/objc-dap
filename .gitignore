@@ -1,3 +1,6 @@
 conan/
 build/
 .vscode/
+.vs/
+bin/
+obj/
