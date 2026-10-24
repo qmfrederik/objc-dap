@@ -32,8 +32,10 @@ namespace Objc.Dap
         /// <param name="cancellationToken">Token used to cancel asynchronous stream forwarding operations.</param>
         /// <returns>A task that represents the asynchronous execution of the process and stream forwarding pipeline.</returns>
         /// <exception cref="InvalidOperationException">Thrown when the LLDB DAP process cannot be started.</exception>
-        public async Task RunAsync(CancellationToken cancellationToken)
+        public Task RunAsync(CancellationToken cancellationToken)
         {
+            // This method runs synchronously to ensure any errors are propagated to the caller immediately.
+            // RunLoop is asynchronous.
             var startInfo = new ProcessStartInfo(this.options.LldbDapPath.FullName)
             {
                 RedirectStandardInput = true,
@@ -51,6 +53,11 @@ namespace Objc.Dap
             var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Failed to start {startInfo.FileName}.");
 
+            return RunLoop(process, cancellationToken);
+        }
+
+        private async Task RunLoop(Process process, CancellationToken cancellationToken)
+        {
             await Task.WhenAny(
                 this.options.Input.CopyToAsync(process.StandardInput.BaseStream, cancellationToken),
                 process.StandardOutput.BaseStream.CopyToAsync(this.options.Output, cancellationToken),
