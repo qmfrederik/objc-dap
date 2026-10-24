@@ -49,6 +49,7 @@ namespace ObjcDap.Tests
         {
             (var clientStream, var serverStream) = FullDuplexStream.CreatePair();
             var monitoringClientStream = new MonitoringStream(clientStream);
+            var monitoringErrorStream = new MonitoringStream(Stream.Null);
 
             monitoringClientStream.DidReadAny += (sender, e) =>
             {
@@ -62,6 +63,12 @@ namespace ObjcDap.Tests
                 this.outputHelper.WriteLine("[DAP Output] " + Encoding.UTF8.GetString(e));
             };
 
+            monitoringErrorStream.DidWriteAny += (sender, e) =>
+            {
+                Debug.WriteLine("[DAP Error] " + Encoding.UTF8.GetString(e));
+                this.outputHelper.WriteLine("[DAP Error] " + Encoding.UTF8.GetString(e));
+            };
+
             DebugProtocolHost host = new DebugProtocolHost(monitoringClientStream, monitoringClientStream);
 
             var services = new ServiceCollection();
@@ -71,9 +78,9 @@ namespace ObjcDap.Tests
             {
                 Input = serverStream,
                 Output = serverStream,
-                Error = Stream.Null,
-                LldbDapPath = Program.DefaultLddbDapPath(),
-                Python3Library = Program.TryFindPyton3Library(),
+                Error = monitoringErrorStream,
+                LldbDapPath = Program.DefaultLldbDapPath()!,
+                Python3Library = Program.DefaultPython3RuntimePath(),
             });
 
             using var provider = services.BuildServiceProvider();

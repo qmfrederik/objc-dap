@@ -7,13 +7,24 @@ namespace Objc.Dap
 {
     public partial class Program
     {
-        private static void DoToolVersionCommand(ParseResult parseResult)
+        public static FileInfo? DefaultLldbDapPath()
         {
             var lldbDapLocator = new LldbDapLocator(new FileSystem(), NullLogger<LldbDapLocator>.Instance);
-            var lldbDapPath = lldbDapLocator.DefaultLldbDapPath();
+            var path = lldbDapLocator.DefaultLldbDapPath();
+            return path == null ? null : new FileInfo(path.FullName);
+        }
 
+        public static FileInfo? DefaultPython3RuntimePath()
+        {
             var pythonLocator = new PythonLocator(new FileSystem(), NullLogger<PythonLocator>.Instance);
-            var python3Library = pythonLocator.TryFindPython3Runtime(new Version(3, 10));
+            var path = pythonLocator.TryFindPython3Runtime(new Version(3, 10));
+            return path == null ? null : new FileInfo(path.FullName);
+        }
+
+        private static void DoToolVersionCommand(ParseResult parseResult)
+        {
+            var lldbDapPath = DefaultLldbDapPath();
+            var python3Library = DefaultPython3RuntimePath();
 
             Version? lldbVersion = null;
             Version? pythonVersion = null;
