@@ -79,7 +79,13 @@ namespace ObjcDap.Tests
             using var provider = services.BuildServiceProvider();
             var proxy = provider.GetRequiredService<DebugAdapterProxy>();
 
-            var task = proxy.RunAsync(TestContext.Current.CancellationToken);
+            var task =
+                proxy.RunAsync(TestContext.Current.CancellationToken)
+                .ContinueWith(_ =>
+                {
+                    monitoringClientStream.Dispose();
+                    host.Stop();
+                }, TestContext.Current.CancellationToken);
             host.Run();
 
             var initializeResponse = host.SendRequestSync(
