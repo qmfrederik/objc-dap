@@ -18,5 +18,7 @@ if(WIN32)
   target_link_options(objcd PRIVATE LINKER:/merge:.objcrt=.data)
 endif()
 
+add_subdirectory(targets)
+
 enable_testing()
 add_subdirectory(tests)
