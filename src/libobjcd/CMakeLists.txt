@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.22)
 
 project(objcd LANGUAGES C CXX)
 
+if(WIN32)
+  # The Conan toolchain only defines the runtime for Release, leaving RelWithDebInfo without a CRT under -nostdlib.
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+endif()
+
 find_package(libobjc2)
 find_package(gnustep-base)
 
@@ -17,6 +22,8 @@ if(WIN32)
   # lld-link discards the empty .objcrt$*$a/$z marker sections in a DLL; merging them keeps the start/stop symbols alive.
   target_link_options(objcd PRIVATE LINKER:/merge:.objcrt=.data)
 endif()
+
+add_subdirectory(targets)
 
 enable_testing()
 add_subdirectory(tests)
