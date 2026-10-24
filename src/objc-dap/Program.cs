@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 
 namespace Objc.Dap
 {
@@ -80,9 +81,40 @@ namespace Objc.Dap
             return null;
         }
 
+        private static void DoToolVersionCommand(ParseResult parseResult)
+        {
+            var lldbDapPath = DefaultLddbDapPath();
+            var python3Library = TryFindPyton3Library();
+            Version? lldbVersion = null;
+            Version? pythonVersion = null;
+
+            if (OperatingSystem.IsWindows() && lldbDapPath != null && lldbDapPath.Exists)
+            {
+                FileVersionInfo lldbVersionInfo = FileVersionInfo.GetVersionInfo(Path.GetFullPath(lldbDapPath.FullName));
+                lldbVersion = new Version(lldbVersionInfo.FileMajorPart, lldbVersionInfo.FileMinorPart, lldbVersionInfo.FileBuildPart);
+            }
+
+            if (OperatingSystem.IsWindows() && python3Library != null && python3Library.Exists)
+            {
+                FileVersionInfo pythonVersionInfo = FileVersionInfo.GetVersionInfo(Path.GetFullPath(python3Library.FullName));
+                pythonVersion = new Version(pythonVersionInfo.FileMajorPart, pythonVersionInfo.FileMinorPart, pythonVersionInfo.FileBuildPart, pythonVersionInfo.FilePrivatePart);
+            }
+
+            Console.WriteLine($"lldb-dap.exe: {lldbDapPath?.FullName} ({lldbVersion})");
+            Console.WriteLine($"python3.dll:  {python3Library?.FullName} ({pythonVersion})");
+        }
+
+        private static Command ToolVersionCommand()
+        {
+            var command = new Command("tool-version", "List the LLDB, objc-dap version and the Python version used by objc-dap.");
+            command.SetAction(DoToolVersionCommand);
+            return command;
+        }
+
         public static int Main(string[] args)
         {
             RootCommand rootCommand = new("Debug Adapter for Objective-C applications");
+            rootCommand.Add(ToolVersionCommand());
 
             var lldbDapPathOption = new Option<FileInfo>("lldb-dap-path")
             {

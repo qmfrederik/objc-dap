@@ -50,6 +50,20 @@ namespace Objc.Dap
                 startInfo.Environment["PATH"] = $"{startInfo.Environment["PATH"]};{this.options.Python3Library.DirectoryName}";
             }
 
+            if (OperatingSystem.IsWindows())
+            {
+                FileVersionInfo lldbVersionInfo = FileVersionInfo.GetVersionInfo(Path.GetFullPath(startInfo.FileName));
+                var lldbVersion = new Version(lldbVersionInfo.FileMajorPart, lldbVersionInfo.FileMinorPart, lldbVersionInfo.FileBuildPart);
+
+                // Loading of Python was reworked with lldb 21.1, see e.g. https://github.com/llvm/llvm-project/commit/0b109532693fec0dce3a8d275b716f5a5fb6e45c
+                // Earlier versions will require python310.dll (or other version-specific numbers), whereas the new versions require python3.dll.
+                // Require a recent version of lldb, or just fail.
+                if (lldbVersion < new Version(23, 1, 0))
+                {
+                    throw new Exception($"The LLDB DAP executable is an older version ({lldbVersion}). Please upgrade to LLDB 23.1.0 or later for better compatibility.");
+                }
+            }
+
             var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Failed to start {startInfo.FileName}.");
 

@@ -37,7 +37,7 @@ namespace ObjcDap.Tests
             using var provider = services.BuildServiceProvider();
             var proxy = provider.GetRequiredService<DebugAdapterProxy>();
 
-            await Assert.ThrowsAsync<Win32Exception>(() => proxy.RunAsync(TestContext.Current.CancellationToken));
+            await Assert.ThrowsAsync<FileNotFoundException>(() => proxy.RunAsync(TestContext.Current.CancellationToken));
         }
 
         /// <summary>
@@ -72,7 +72,7 @@ namespace ObjcDap.Tests
                 Input = serverStream,
                 Output = serverStream,
                 Error = Stream.Null,
-                LldbDapPath = Program.DefaultLddbDapPath(),
+                LldbDapPath = new FileInfo(@"C:\Users\fredcarl\Downloads\clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar\clang+llvm-20.1.8-x86_64-pc-windows-msvc\bin\lldb-dap.exe"), // Program.DefaultLddbDapPath(),
                 Python3Library = Program.TryFindPyton3Library(),
             });
 
