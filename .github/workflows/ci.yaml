@@ -56,12 +56,20 @@ jobs:
           call conan\conanrun.bat
           ctest --test-dir build --output-on-failure
         working-directory: src/libobjcd
-      - name: Test objc-dap
+      - name: Build objc-dap
         run: |
           dotnet restore
+          dotnet build
+        working-directory: src
+      - name: Show LLVM, Python 3 version data
+        run: |
+          dotnet run -- tool-version
+        working-directory: src/objc-dap
+      - name: Test objc-dap
+        run: |
           dotnet test
         working-directory: src
-      - name: Test objc-dap
+      - name: Publish objc-dap
         run: |
           dotnet publish -c Release
           .\bin\Release\net10.0\win-x64\publish\objc-dap.exe --version
