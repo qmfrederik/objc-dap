@@ -4,6 +4,7 @@ using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using Nerdbank.Streams;
 using Objc.Dap;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Text;
 
@@ -16,6 +17,27 @@ namespace ObjcDap.Tests
         public DebugAdapterProxyTests(ITestOutputHelper outputHelper)
         {
             this.outputHelper = outputHelper ?? throw new ArgumentNullException(nameof(outputHelper));
+        }
+
+        [Fact]
+        public async Task Connect_InvalidPath_Fails()
+        {
+            var services = new ServiceCollection();
+            services.AddLogging(s => s.AddXUnit(this.outputHelper));
+            services.AddSingleton<DebugAdapterProxy>();
+            services.AddSingleton(new DebugAdapterOptions()
+            {
+                Input = Stream.Null,
+                Output = Stream.Null,
+                Error = Stream.Null,
+                LldbDapPath = new FileInfo("C:\\InvalidPath\\invalid-executable.exe"),
+                Python3Library = Program.TryFindPyton3Library(),
+            });
+
+            using var provider = services.BuildServiceProvider();
+            var proxy = provider.GetRequiredService<DebugAdapterProxy>();
+
+            await Assert.ThrowsAsync<Win32Exception>(() => proxy.RunAsync(TestContext.Current.CancellationToken));
         }
 
         /// <summary>
