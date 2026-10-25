@@ -40,7 +40,7 @@ namespace Objc.Dap.Protocol
         /// variable in the UI.
         /// </summary>
         [JsonPropertyName("presentationHint")]
-        public string? PresentationHint { get; set; }
+        public VariablePresentationHint? PresentationHint { get; set; }
 
         /// <summary>
         /// Gets or sets the evaluatable name of this variable which can be passed to the
