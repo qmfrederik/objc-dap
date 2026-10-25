@@ -47,7 +47,7 @@ namespace Objc.Dap
 
             if (OperatingSystem.IsWindows() && this.options.Python3Library != null)
             {
-                startInfo.Environment["PATH"] = $"{startInfo.Environment["PATH"]};{this.options.Python3Library.DirectoryName}";
+                startInfo.Environment["PATH"] = $"{this.options.Python3Library.DirectoryName};{startInfo.Environment["PATH"]}";
             }
 
             var process = Process.Start(startInfo)
