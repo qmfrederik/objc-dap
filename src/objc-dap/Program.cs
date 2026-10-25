@@ -2,12 +2,14 @@
 
 namespace Objc.Dap
 {
-    public class Program
+    public partial class Program
     {
         public static int Main(string[] args)
         {
             RootCommand rootCommand = new("Debug Adapter for Objective-C applications");
             rootCommand.SetAction(Run);
+
+            rootCommand.Add(ToolVersionCommand());
 
             return rootCommand.Parse(args).Invoke();
         }
