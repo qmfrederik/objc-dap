@@ -43,7 +43,7 @@ namespace ObjcDap.Tests
                 this.outputHelper.WriteLine("[DAP Error] " + Encoding.UTF8.GetString(e));
             };
 
-            this.host = new DebugProtocolHost(this.clientStream, this.clientStream);
+            this.host = new DebugProtocolHost(this.clientStream, this.clientStream, registerStandardHandlers: false);
 
             var services = new ServiceCollection();
             services.AddLogging(s => s.AddXUnit(this.outputHelper));
