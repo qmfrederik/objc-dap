@@ -47,68 +47,25 @@ namespace ObjcDap.Tests
         [Fact]
         public async Task ConnectAndDisconnect_Works()
         {
-            (var clientStream, var serverStream) = FullDuplexStream.CreatePair();
-            var monitoringClientStream = new MonitoringStream(clientStream);
-            var monitoringErrorStream = new MonitoringStream(Stream.Null);
-
-            monitoringClientStream.DidReadAny += (sender, e) =>
+            using (var client = new DapClient(this.outputHelper))
             {
-                Debug.WriteLine("[DAP Input] " + Encoding.UTF8.GetString(e));
-                this.outputHelper.WriteLine("[DAP Input] " + Encoding.UTF8.GetString(e));
-            };
+                var task = client.Run(TestContext.Current.CancellationToken);
 
-            monitoringClientStream.DidWriteAny += (sender, e) =>
-            {
-                Debug.WriteLine("[DAP Output] " + Encoding.UTF8.GetString(e));
-                this.outputHelper.WriteLine("[DAP Output] " + Encoding.UTF8.GetString(e));
-            };
+                var initializeResponse = client.Host.SendRequestSync(
+                    new InitializeRequest()
+                    {
+                        AdapterID = "objc-dap",
+                        LinesStartAt1 = true,
+                        ColumnsStartAt1 = true,
+                    });
 
-            monitoringErrorStream.DidWriteAny += (sender, e) =>
-            {
-                Debug.WriteLine("[DAP Error] " + Encoding.UTF8.GetString(e));
-                this.outputHelper.WriteLine("[DAP Error] " + Encoding.UTF8.GetString(e));
-            };
+                client.Host.SendRequestSync(
+                    new DisconnectRequest()
+                    {
+                    });
 
-            DebugProtocolHost host = new DebugProtocolHost(monitoringClientStream, monitoringClientStream);
-
-            var services = new ServiceCollection();
-            services.AddLogging(s => s.AddXUnit(this.outputHelper));
-            services.AddSingleton<DebugAdapterProxy>();
-            services.AddSingleton(new DebugAdapterOptions()
-            {
-                Input = serverStream,
-                Output = serverStream,
-                Error = monitoringErrorStream,
-                LldbDapPath = Program.DefaultLldbDapPath()!,
-                Python3Library = Program.DefaultPython3RuntimePath(),
-            });
-
-            using var provider = services.BuildServiceProvider();
-            var proxy = provider.GetRequiredService<DebugAdapterProxy>();
-
-            var task =
-                proxy.RunAsync(TestContext.Current.CancellationToken)
-                .ContinueWith(_ =>
-                {
-                    monitoringClientStream.Dispose();
-                    host.Stop();
-                }, TestContext.Current.CancellationToken);
-            host.Run();
-
-            var initializeResponse = host.SendRequestSync(
-                new InitializeRequest()
-                {
-                    AdapterID = "objc-dap",
-                    LinesStartAt1 = true,
-                    ColumnsStartAt1 = true,
-                });
-
-            host.SendRequestSync(
-                new DisconnectRequest()
-                {
-                });
-
-            await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
         }
     }
 }
