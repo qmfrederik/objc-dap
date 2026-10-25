@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Objc.Dap
+namespace Objc.Dap.Protocol
 {
     public class ProtocolMessage
     {

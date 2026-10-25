@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Objc.Dap.Protocol;
 using System.Buffers;
 using System.Diagnostics;
 using System.IO.Pipelines;
@@ -110,21 +111,65 @@ namespace Objc.Dap
                     if (buffer.Length >= header.Length + 4 /* \r\n\r\n */ + length)
                     {
                         var message = buffer.Slice(header.Length + 4, length);
+                        var messageWithHeader = buffer.Slice(0, header.Length + 4 + length);
 
                         var jsonReader = new Utf8JsonReader(message);
-                        var value = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.ProtocolMessage);
+                        var value = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.ProtocolMessage)!;
 
-                        var messageWithHeader = buffer.Slice(0, header.Length + 4 + length);
-                        foreach (var span in messageWithHeader)
+                        // Reset the reader
+                        jsonReader = new Utf8JsonReader(message);
+
+                        switch (value.Type)
                         {
-                            await target.WriteAsync(span, cancellationToken);
+                            case ProtocolMessageType.Request:
+                                var request = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Request)!;
+                                await this.ProxyRequest(messageWithHeader, message, request, target, cancellationToken);
+                                break;
+
+                            case ProtocolMessageType.Response:
+                                var response = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Response)!;
+                                await this.ProxyResponse(messageWithHeader, message, response, target, cancellationToken);
+                                break;
+
+                            case ProtocolMessageType.Event:
+                                var @event = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Event)!;
+                                await this.ProxyEvent(messageWithHeader, message, @event, target, cancellationToken);
+                                break;
+
+                            default:
+                                await this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+                                break;
                         }
+
                         reader.AdvanceTo(message.End);
                         continue;
                     }
                 }
 
                 reader.AdvanceTo(buffer.Start, buffer.End);
+            }
+        }
+
+        protected virtual Task ProxyRequest(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Request request, Stream target, CancellationToken cancellationToken)
+        {
+            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+        }
+
+        protected virtual Task ProxyResponse(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Response response, Stream target, CancellationToken cancellationToken)
+        {
+            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+        }
+
+        protected virtual Task ProxyEvent(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Event @event, Stream target, CancellationToken cancellationToken)
+        {
+            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+        }
+
+        protected virtual async Task ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Stream target, CancellationToken cancellationToken)
+        {
+            foreach (var span in messageWithHeader)
+            {
+                await target.WriteAsync(span, cancellationToken);
             }
         }
     }
