@@ -11,6 +11,8 @@ namespace Objc.Dap
 
         public abstract int Read(nuint baseAddress, Span<byte> buffer);
 
+        public abstract bool IsDereferencableMemory(nuint baseAddress);
+
         /// <inheritdoc/>
         public abstract void Dispose();
     }

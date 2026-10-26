@@ -3,6 +3,7 @@ using Microsoft.Win32.SafeHandles;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Windows.Win32.System.Memory;
 using Windows.Win32.System.Threading;
 using static Windows.Win32.PInvoke;
 
@@ -25,7 +26,10 @@ namespace Objc.Dap
                 throw new InvalidOperationException("Process is already open.");
             }
 
-            this.handle = OpenProcess_SafeHandle(PROCESS_ACCESS_RIGHTS.PROCESS_VM_READ, bInheritHandle: false, (uint)processId);
+            this.handle = OpenProcess_SafeHandle(
+                PROCESS_ACCESS_RIGHTS.PROCESS_VM_READ | PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_INFORMATION,
+                bInheritHandle: false,
+                (uint)processId);
 
             if (this.handle.IsInvalid)
             {
@@ -44,13 +48,32 @@ namespace Objc.Dap
             }
             ;
 
-            if(!ReadProcessMemory(this.handle, (void*)baseAddress, buffer, out nuint bytesRead))
+            if (!ReadProcessMemory(this.handle, (void*)baseAddress, buffer, out nuint bytesRead))
             {
                 var error = Marshal.GetLastWin32Error();
                 throw new Win32Exception(error);
             }
 
             return (int)bytesRead;
+        }
+
+        public override unsafe bool IsDereferencableMemory(nuint baseAddress)
+        {
+            if (VirtualQueryEx(this.handle, (void*)baseAddress, out var memoryBasicInformation) == 0)
+            {
+                var error = Marshal.GetLastWin32Error();
+
+                if (error == (int)Windows.Win32.Foundation.WIN32_ERROR.ERROR_INVALID_PARAMETER)
+                {
+                    return false;
+                }
+
+                throw new Win32Exception(error);
+            }
+
+            return (memoryBasicInformation.State == VIRTUAL_ALLOCATION_TYPE.MEM_COMMIT)
+                && !memoryBasicInformation.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_NOACCESS)
+                && !memoryBasicInformation.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_GUARD);
         }
 
         /// <inheritdoc/>

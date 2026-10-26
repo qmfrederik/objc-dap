@@ -33,12 +33,33 @@ namespace ObjcDap.Tests
             Span<byte> source = stackalloc byte[4] { 1, 2, 3, 4 };
             Span<byte> target = stackalloc byte[4] { 0, 0, 0, 0 };
 
-            fixed(byte* sourcePtr = source)
+            fixed (byte* sourcePtr = source)
             {
                 int bytesRead = reader.Read((nuint)sourcePtr, target);
                 Assert.Equal(4, bytesRead);
                 Assert.Equal(source, target);
             }
+        }
+
+        [WindowsFact]
+        public unsafe void IsDereferencableMemory_Works()
+        {
+            using var reader = new Win32ProcessMemoryReader();
+            reader.Open(Environment.ProcessId);
+
+            Span<byte> source = stackalloc byte[4] { 1, 2, 3, 4 };
+
+            fixed (byte* sourcePtr = source)
+            {
+                Assert.True(reader.IsDereferencableMemory((nuint)sourcePtr));
+            }
+
+            unchecked
+            {
+                Assert.False(reader.IsDereferencableMemory((nuint)0xbaadf00dbaadf00d));
+            }
+
+            Assert.False(reader.IsDereferencableMemory((nuint)0));
         }
     }
 }
