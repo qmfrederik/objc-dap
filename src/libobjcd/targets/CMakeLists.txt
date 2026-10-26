@@ -7,6 +7,10 @@ add_executable(SimpleTarget_CanReadVariables SimpleTarget_CanReadVariables.m)
 target_compile_options(SimpleTarget_CanReadVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(ObjcRuntime_CanReadStrings ObjcRuntime_CanReadStrings.m)
+target_compile_options(ObjcRuntime_CanReadStrings PRIVATE -O0)
+target_link_libraries(ObjcRuntime_CanReadStrings PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 # Copy required DLLs to the build directory on Windows after building the target executable.
 if(WIN32)
     add_custom_command(TARGET target POST_BUILD
