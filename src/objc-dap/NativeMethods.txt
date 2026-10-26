@@ -1,0 +1,4 @@
+﻿OpenProcess
+ReadProcessMemory
+VirtualQueryEx
+WIN32_ERROR

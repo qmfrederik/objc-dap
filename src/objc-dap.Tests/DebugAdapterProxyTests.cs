@@ -64,22 +64,22 @@ namespace ObjcDap.Tests
             }
         }
 
-        private static string GetTargetPath(string name)
+        public static string GetTargetPath(string name)
         {
             return
                 Path.GetFullPath(
                     Path.Combine(
                     Environment.CurrentDirectory,
-                    $"../../../../libobjcd/build/targets/{name}.exe"));
+                    $"../../../../../libobjcd/build/targets/{name}.exe"));
         }
 
-        private static string GetSourcePath(string name)
+        public static string GetSourcePath(string name)
         {
             return
                 Path.GetFullPath(
                     Path.Combine(
                     Environment.CurrentDirectory,
-                    $"../../../../libobjcd/targets/",
+                    $"../../../../../libobjcd/targets/",
                     name));
         }
 
