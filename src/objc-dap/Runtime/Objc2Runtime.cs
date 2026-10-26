@@ -1,12 +1,14 @@
 ﻿using Microsoft.Extensions.Logging;
+using System.Buffers;
 using System.Buffers.Binary;
 
 namespace Objc.Dap.Runtime
 {
-    public class Objc2Runtime
+    public partial class Objc2Runtime
     {
         private readonly ProcessMemoryReader processMemoryReader;
         private readonly ILogger<Objc2Runtime> logger;
+        private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
 
         public Objc2Runtime(ProcessMemoryReader processMemoryReader, ILogger<Objc2Runtime> logger)
         {
@@ -16,6 +18,16 @@ namespace Objc.Dap.Runtime
 
         public Objc2Object ReadObject(nuint address)
         {
+            // If the value is a tiny string, return immediately.
+            if ((address & TINY_STRING_MASK) == TINY_STRING_MASK)
+            {
+                return new Objc2Object()
+                {
+                    Address = address,
+                    Isa = 0 // Tiny strings don't have an isa pointer
+                };
+            }
+
             // The objc_object layout is as follows:
             // typedef struct objc_object
             // {
@@ -43,7 +55,11 @@ namespace Objc.Dap.Runtime
                 return Objc2Object.Null;
             }
 
-            return new Objc2Object() { Isa = isa };
+            return new Objc2Object()
+            {
+                Address = address,
+                Isa = isa
+            };
         }
 
         public Objc2Class ReadClass(nuint isa)
