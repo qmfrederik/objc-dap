@@ -76,7 +76,7 @@ namespace ObjcDap.Tests.Runtime
                     className = runtime.GetClassName(objcClass);
                 }
 
-                var value = runtime.GetStringValue(objcValue);
+                var value = Assert.IsType<string>(runtime.GetObjectValue(objcValue));
                 Assert.Equal(values[name], value);
                 values.Remove(name);
 
@@ -136,7 +136,7 @@ namespace ObjcDap.Tests.Runtime
                 classNames.Remove(name);
 
                 var expectedValue = values[name]!;
-                var value = runtime.GetNSNumber(objcValue);
+                var value = runtime.GetObjectValue(objcValue);
                 Assert.Equal(expectedValue, value);
 
                 values.Remove(name);
