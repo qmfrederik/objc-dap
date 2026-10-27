@@ -7,7 +7,7 @@ namespace Objc.Dap.Protocol
     [JsonSerializable(typeof(Request))]
     [JsonSerializable(typeof(Response))]
     [JsonSerializable(typeof(Event))]
-    internal partial class DebugAdapterSerializerContext : JsonSerializerContext
+    public partial class DebugAdapterSerializerContext : JsonSerializerContext
     {
     }
 }

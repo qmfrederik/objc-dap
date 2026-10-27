@@ -2,7 +2,7 @@
 
 namespace Objc.Dap.Protocol
 {
-    internal class VariablesResponse : Response
+    public class VariablesResponse : Response
     {
         public const string CommandName = "variables";
 
