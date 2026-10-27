@@ -19,6 +19,10 @@ add_executable(ObjcRuntime_CanReadBaseTypes ObjcRuntime_CanReadBaseTypes.m)
 target_compile_options(ObjcRuntime_CanReadBaseTypes PRIVATE -O0)
 target_link_libraries(ObjcRuntime_CanReadBaseTypes PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(ObjcRuntime_CanReadArray ObjcRuntime_CanReadArray.m)
+target_compile_options(ObjcRuntime_CanReadArray PRIVATE -O0)
+target_link_libraries(ObjcRuntime_CanReadArray PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 # Copy required DLLs to the build directory on Windows after building the target executable.
 if(WIN32)
     add_custom_command(TARGET target POST_BUILD

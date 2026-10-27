@@ -195,6 +195,51 @@ namespace ObjcDap.Tests.Runtime
             Assert.Empty(values);
         }
 
+        [Fact]
+        public void ObjcRuntime_CanReadArray()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "emptyArray", "GSInlineArray" },
+                { "stringArray", "GSInlineArray" },
+                { "mixedArray", "GSInlineArray" },
+                { "nestedArray", "GSInlineArray" },
+                { "mutableArray", "GSMutableArray" },
+                { "grownArray", "GSMutableArray" },
+                { "copiedArray", "GSInlineArray" },
+            };
+
+            Dictionary<string, object?> values = new Dictionary<string, object?>()
+            {
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                //var expectedValue = values[name]!;
+                //var value = runtime.GetObjectValue(objcValue);
+                //Assert.Equal(expectedValue, value);
+
+                // values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
         private IEnumerable<(Objc2Runtime runtime, string variableName, ulong adddress)> ReadLines(string testName)
         {
             var psi = new ProcessStartInfo()
