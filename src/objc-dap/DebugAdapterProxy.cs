@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.VisualStudio.Threading;
 using Objc.Dap.Protocol;
 using System.Buffers;
 using System.Diagnostics;
@@ -15,6 +16,12 @@ namespace Objc.Dap
     {
         private readonly DebugAdapterOptions options;
         private readonly ILogger<DebugAdapterProxy> logger;
+        private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
+
+        // Messages which are about to be proxied are stored on these queues, allowing multiple threads to post
+        // messages in parallel.
+        private readonly AsyncQueue<Message?> serverQueue = new AsyncQueue<Message?>();
+        private readonly AsyncQueue<Message?> clientQueue = new AsyncQueue<Message?>();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DebugAdapterProxy"/> class.
@@ -58,24 +65,37 @@ namespace Objc.Dap
             var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Failed to start {startInfo.FileName}.");
 
-            return RunLoop(process, cancellationToken);
+            return RunLoopAsync(process, cancellationToken);
         }
 
-        private async Task RunLoop(Process process, CancellationToken cancellationToken)
+        private async Task RunLoopAsync(Process process, CancellationToken cancellationToken)
         {
             await Task.WhenAny(
-                this.DapProxyLoop(this.options.Input, process.StandardInput.BaseStream, cancellationToken),
-                this.DapProxyLoop(process.StandardOutput.BaseStream, this.options.Output, cancellationToken),
+                this.DapProxyLoopAsync(this.options.Input, this.serverQueue, cancellationToken),
+                this.DapProxyLoopAsync(this.serverQueue, process.StandardInput.BaseStream, cancellationToken),
+                this.DapProxyLoopAsync(process.StandardOutput.BaseStream, this.clientQueue, cancellationToken),
+                this.DapProxyLoopAsync(this.clientQueue, this.options.Output, cancellationToken),
                 process.StandardError.BaseStream.CopyToAsync(this.options.Error, cancellationToken));
 
             process.Kill(entireProcessTree: true);
+        }
+
+        private async Task DapProxyLoopAsync(AsyncQueue<Message?> queue, Stream target, CancellationToken cancellationToken)
+        {
+            Message? message;
+
+            while ((message = await queue.DequeueAsync(cancellationToken)) != null)
+            {
+                await target.WriteAsync(message.Value, cancellationToken);
+                message.Dispose();
+            }
         }
 
         //Asynchronously reads Debug Adapter Protocol messages from a source stream, parses framed JSON payloads, and
         /// advances the reader as messages are consumed.
         /// <remarks>Expects DAP framing with a single Content-Length header, followed by \r\n\r\n and a
         /// UTF-8 JSON payload.</remarks>Stream that provides incoming protocol data.Stream intended to receive proxied protocol data.Token that cancels pending reads and stops the loop.A task that completes when the source stream is completed or cancellation is requested.
-        private async Task DapProxyLoop(Stream source, Stream target, CancellationToken cancellationToken)
+        private async Task DapProxyLoopAsync(Stream source, AsyncQueue<Message?> target, CancellationToken cancellationToken)
         {
             var reader = PipeReader.Create(source);
 
@@ -84,12 +104,13 @@ namespace Objc.Dap
                 var result = await reader.ReadAsync(cancellationToken);
                 if (result.IsCompleted)
                 {
+                    target.Enqueue(null);
                     return;
                 }
 
                 var buffer = result.Buffer;
 
-                // Only a single header is supported, i.e. finding the first '\r` character will get us
+                // Only a single header is supported, i.e. finding the first '\r' character will get us
                 // to the end of Content-Length:
                 // Content-Length: 119\r\n
                 // \r\n
@@ -123,21 +144,21 @@ namespace Objc.Dap
                         {
                             case ProtocolMessageType.Request:
                                 var request = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Request)!;
-                                await this.ProxyRequest(messageWithHeader, message, request, target, cancellationToken);
+                                this.ProxyRequest(messageWithHeader, message, request, target);
                                 break;
 
                             case ProtocolMessageType.Response:
                                 var response = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Response)!;
-                                await this.ProxyResponse(messageWithHeader, message, response, target, cancellationToken);
+                                this.ProxyResponse(messageWithHeader, message, response, target);
                                 break;
 
                             case ProtocolMessageType.Event:
                                 var @event = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Event)!;
-                                await this.ProxyEvent(messageWithHeader, message, @event, target, cancellationToken);
+                                this.ProxyEvent(messageWithHeader, message, @event, target);
                                 break;
 
                             default:
-                                await this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+                                this.ProxyMessage(messageWithHeader, message, value, target);
                                 break;
                         }
 
@@ -150,27 +171,30 @@ namespace Objc.Dap
             }
         }
 
-        protected virtual Task ProxyRequest(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Request request, Stream target, CancellationToken cancellationToken)
+        protected void ProxyRequest(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, Request request, AsyncQueue<Message?> target)
         {
-            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+            this.ProxyMessage(messageWithHeader, messageBytes, request, target);
         }
 
-        protected virtual Task ProxyResponse(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Response response, Stream target, CancellationToken cancellationToken)
+        protected void ProxyResponse(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, Response response, AsyncQueue<Message?> target)
         {
-            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+            this.ProxyMessage(messageWithHeader, messageBytes, response, target);
         }
 
-        protected virtual Task ProxyEvent(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Event @event, Stream target, CancellationToken cancellationToken)
+        protected void ProxyEvent(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, Event @event, AsyncQueue<Message?> target)
         {
-            return this.ProxyMessage(messageWithHeader, message, target, cancellationToken);
+            this.ProxyMessage(messageWithHeader, messageBytes, @event, target);
         }
 
-        protected virtual async Task ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> message, Stream target, CancellationToken cancellationToken)
+        protected virtual void ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target)
         {
-            foreach (var span in messageWithHeader)
-            {
-                await target.WriteAsync(span, cancellationToken);
-            }
+            var owner = this.memoryPool.Rent((int)messageWithHeader.Length);
+            var messageMemory = owner.Memory.Slice(0, (int)messageWithHeader.Length);
+
+            messageWithHeader.CopyTo(messageMemory.Span);
+
+            target.Enqueue(
+                new Message(owner, messageMemory, message.Type, message));
         }
     }
 }
