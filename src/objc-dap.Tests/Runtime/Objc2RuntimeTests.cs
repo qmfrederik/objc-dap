@@ -2,6 +2,7 @@
 using Objc.Dap;
 using Objc.Dap.Runtime;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 
 namespace ObjcDap.Tests.Runtime
@@ -153,7 +154,6 @@ namespace ObjcDap.Tests.Runtime
             {
                 { "date", null },
                 { "url", "NSURL" },
-                { "error", "NSError" },
                 { "point", "GSPointValue" },
                 { "size", "GSSizeValue" },
                 { "rect", "GSRectValue" },
@@ -161,6 +161,11 @@ namespace ObjcDap.Tests.Runtime
 
             Dictionary<string, object?> values = new Dictionary<string, object?>()
             {
+                { "date", new DateTimeOffset(2023, 11, 14, 22, 13, 20, TimeSpan.Zero) },
+                { "url", new Uri("https://example.com/path?query=1") },
+                { "point", new PointF(1.5f, 2.5f) },
+                { "size", new SizeF(640f, 480f) },
+                { "rect", new RectangleF(10f, 20f, 300f, 200f) },
             };
 
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadBaseTypes)))
@@ -177,6 +182,10 @@ namespace ObjcDap.Tests.Runtime
 
                 Assert.Equal(classNames[name], className);
                 classNames.Remove(name);
+                
+                var expectedValue = values[name]!;
+                var value = runtime.GetObjectValue(objcValue);
+                Assert.Equal(expectedValue, value);
 
                 values.Remove(name);
             }
