@@ -2,6 +2,7 @@
 using Objc.Dap;
 using Objc.Dap.Runtime;
 using System.Diagnostics;
+using System.Drawing;
 using System.Globalization;
 
 namespace ObjcDap.Tests.Runtime
@@ -75,7 +76,7 @@ namespace ObjcDap.Tests.Runtime
                     className = runtime.GetClassName(objcClass);
                 }
 
-                var value = runtime.GetStringValue(objcValue);
+                var value = Assert.IsType<string>(runtime.GetObjectValue(objcValue));
                 Assert.Equal(values[name], value);
                 values.Remove(name);
 
@@ -135,7 +136,55 @@ namespace ObjcDap.Tests.Runtime
                 classNames.Remove(name);
 
                 var expectedValue = values[name]!;
-                var value = runtime.GetNSNumber(objcValue);
+                var value = runtime.GetObjectValue(objcValue);
+                Assert.Equal(expectedValue, value);
+
+                values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanReadBaseTypes()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "date", null },
+                { "url", "NSURL" },
+                { "point", "GSPointValue" },
+                { "size", "GSSizeValue" },
+                { "rect", "GSRectValue" },
+            };
+
+            Dictionary<string, object?> values = new Dictionary<string, object?>()
+            {
+                { "date", new DateTimeOffset(2023, 11, 14, 22, 13, 20, TimeSpan.Zero) },
+                { "url", new Uri("https://example.com/path?query=1") },
+                { "point", new PointF(1.5f, 2.5f) },
+                { "size", new SizeF(640f, 480f) },
+                { "rect", new RectangleF(10f, 20f, 300f, 200f) },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadBaseTypes)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+                
+                var expectedValue = values[name]!;
+                var value = runtime.GetObjectValue(objcValue);
                 Assert.Equal(expectedValue, value);
 
                 values.Remove(name);

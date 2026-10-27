@@ -8,5 +8,6 @@
         RepeatingDouble = 3,
         String = 4,
         Float = 5,
+        Date = 6,
     }
 }

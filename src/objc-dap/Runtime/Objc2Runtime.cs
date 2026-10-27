@@ -12,10 +12,70 @@ namespace Objc.Dap.Runtime
         private readonly ILogger<Objc2Runtime> logger;
         private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
 
+        private readonly Dictionary<string, Func<Objc2Object, object?>> readers = new Dictionary<string, Func<Objc2Object, object?>>();
+
         public Objc2Runtime(ProcessMemoryReader processMemoryReader, ILogger<Objc2Runtime> logger)
         {
             this.processMemoryReader = processMemoryReader ?? throw new ArgumentNullException(nameof(processMemoryReader));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+            this.readers.Add("NSIntNumber", (obj) => GetInt32Value(obj));
+            this.readers.Add("NSLongLongNumber", (obj) => GetInt64Value(obj));
+            this.readers.Add("NSUnsignedLongLongNumber", (obj) => GetUInt64Value(obj));
+            this.readers.Add("NSBoolNumber", (obj) => GetBoolean(obj));
+            this.readers.Add("NSDoubleNumber", (obj) => GetDoubleValue(obj));
+            this.readers.Add("NSString", this.GetStringValue);
+            this.readers.Add("NSConstantString", this.GetNSConstantStringValue);
+            this.readers.Add("GSCInlineString", this.GetGSCInlineStringValue);
+            this.readers.Add("GSMutableString", this.GetGSCInlineStringValue);
+            this.readers.Add("NSURL", this.GetUriValue);
+            this.readers.Add("GSPointValue", (obj) => this.GetPointValue(obj));
+            this.readers.Add("GSSizeValue", (obj) => this.GetSizeValue(obj));
+            this.readers.Add("GSRectValue", (obj) => this.GetRectValue(obj));
+        }
+
+        public object? GetObjectValue(Objc2Object @object)
+        {
+            if (@object == Objc2Object.Null)
+            {
+                return null;
+            }
+
+            switch (@object.SmallObjectType)
+            {
+                case SmallObjectType.Int:
+                    return this.GetInt32Value(@object);
+
+                case SmallObjectType.ExtendedDouble:
+                    return this.GetDoubleValue(@object);
+
+                case SmallObjectType.RepeatingDouble:
+                    return this.GetDoubleValue(@object);
+
+                case SmallObjectType.String:
+                    return this.GetStringValue(@object);
+
+                case SmallObjectType.Float:
+                    return this.GetFloatValue(@object);
+
+                case SmallObjectType.Date:
+                    return this.GetDateValue(@object);
+            }
+
+            var @class = this.ReadClass(@object.Isa);
+            var className = this.GetClassName(@class);
+
+            if (className == null)
+            {
+                return null;
+            }
+
+            if (this.readers.ContainsKey(className))
+            {
+                return this.readers[className](@object);
+            }
+
+            return null;
         }
 
         public Objc2Object ReadObject(nuint address)
