@@ -6,6 +6,8 @@ namespace Objc.Dap.Runtime
 {
     public partial class Objc2Runtime
     {
+        public const uint OBJC_SMALL_OBJECT_MASK = 0x7;
+
         private readonly ProcessMemoryReader processMemoryReader;
         private readonly ILogger<Objc2Runtime> logger;
         private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
@@ -18,13 +20,13 @@ namespace Objc.Dap.Runtime
 
         public Objc2Object ReadObject(nuint address)
         {
-            // If the value is a tiny string, return immediately.
-            if ((address & TINY_STRING_MASK) == TINY_STRING_MASK)
+            // If the value is a small object, return immediately.
+            if ((address & OBJC_SMALL_OBJECT_MASK) != 0)
             {
                 return new Objc2Object()
                 {
                     Address = address,
-                    Isa = 0 // Tiny strings don't have an isa pointer
+                    Isa = 0 // Small objects don't have an isa pointer
                 };
             }
 

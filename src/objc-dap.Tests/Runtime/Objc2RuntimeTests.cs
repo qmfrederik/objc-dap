@@ -26,7 +26,7 @@ namespace ObjcDap.Tests.Runtime
 
                 var objcValue = runtime.ReadObject((nuint)address);
 
-                if (objcValue != Objc2Object.Null)
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
                 {
                     var objcClass = runtime.ReadClass(objcValue.Isa);
                     className = runtime.GetClassName(objcClass);
@@ -69,7 +69,7 @@ namespace ObjcDap.Tests.Runtime
 
                 var objcValue = runtime.ReadObject((nuint)address);
 
-                if (objcValue != Objc2Object.Null && !objcValue.IsTinyString)
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
                 {
                     var objcClass = runtime.ReadClass(objcValue.Isa);
                     className = runtime.GetClassName(objcClass);
@@ -81,6 +81,64 @@ namespace ObjcDap.Tests.Runtime
 
                 Assert.Equal(classNames[name], className);
                 classNames.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanReadNumbers()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "smallInt", null },
+                { "smallFloat", null },
+                { "smallRepeatingDouble", null },
+                { "smallExtendedDouble", null },
+                { "boolNumber", "NSBoolNumber" },
+                { "reusedInt", "NSIntNumber" },
+                { "intNumber", "NSIntNumber" },
+                { "longLongNumber", "NSLongLongNumber" },
+                { "unsignedLongLongNumber", "NSUnsignedLongLongNumber" },
+                { "doubleNumber", "NSDoubleNumber" },
+            };
+
+            Dictionary<string, object?> values = new Dictionary<string, object?>()
+            {
+                { "smallInt", 42 },
+                { "smallFloat", 3.14f },
+                { "smallRepeatingDouble", 1.0d },
+                { "smallExtendedDouble", 3.14d },
+                { "boolNumber", true },
+                { "reusedInt", 5 },
+                { "intNumber", 1234567890 },
+                { "longLongNumber", 5000000000L },
+                { "unsignedLongLongNumber", 18446744073709551615ul },
+                { "doubleNumber", 2.718281828459045d },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadNumbers)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                var expectedValue = values[name]!;
+                var value = runtime.GetNSNumber(objcValue);
+                Assert.Equal(expectedValue, value);
+
+                values.Remove(name);
             }
 
             // All expected values have been processed.

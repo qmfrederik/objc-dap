@@ -6,11 +6,11 @@ namespace Objc.Dap.Runtime
 {
     public partial class Objc2Runtime
     {
-        public const uint TINY_STRING_MASK = 4;
-
         public string? GetStringValue(Objc2Object @object)
         {
-            if (@object.IsTinyString)
+            ArgumentNullException.ThrowIfNull(@object);
+
+            if (@object.SmallObjectType == SmallObjectType.String)
             {
                 return this.GetTinyStringValue(@object);
             }
@@ -28,6 +28,8 @@ namespace Objc.Dap.Runtime
         
         public string? GetTinyStringValue(Objc2Object @object)
         {
+            ArgumentNullException.ThrowIfNull(@object);
+
             const int MaxLength = 9;  // a 9th byte is an implicit NULL
 
             int length = (int)((@object.Address >> 3) & 0x1f);
@@ -45,6 +47,8 @@ namespace Objc.Dap.Runtime
 
         public string GetNSConstantStringValue(Objc2Object @object)
         {
+            ArgumentNullException.ThrowIfNull(@object);
+
             // See https://github.com/gnustep/libs-base/blob/master/Headers/Foundation/NSString.h#L1190
             //
             // The NSConstantString layout is as follows:
@@ -92,6 +96,8 @@ namespace Objc.Dap.Runtime
 
         public string GetGSCInlineStringValue(Objc2Object @object)
         {
+            ArgumentNullException.ThrowIfNull(@object);
+
             // https://github.com/gnustep/libs-base/blob/master/Source/GSPrivate.h#L236
             // Layout:
             // Class        isa
