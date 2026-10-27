@@ -182,10 +182,62 @@ namespace ObjcDap.Tests.Runtime
 
                 Assert.Equal(classNames[name], className);
                 classNames.Remove(name);
-                
+
                 var expectedValue = values[name]!;
                 var value = runtime.GetObjectValue(objcValue);
                 Assert.Equal(expectedValue, value);
+
+                values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanReadArray()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "emptyArray", "GSInlineArray" },
+                { "stringArray", "GSInlineArray" },
+                { "mutableArray", "GSMutableArray" },
+            };
+
+            Dictionary<string, object?[]> values = new Dictionary<string, object?[]>()
+            {
+                { "emptyArray", new object?[]{ } },
+                { "stringArray",new object?[]{ "one", "two", "three" }},
+                { "mutableArray", new object?[]{ "a", "b", "c", 42 } },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                var expectedValue = values[name]!;
+                var count = runtime.GetIndexedVariablesCount(objcValue);
+                Assert.Equal(expectedValue.Length, count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    var nestedObject = runtime.GetIndexedVariable(objcValue, i);
+                    var nestedValue = runtime.GetObjectValue(nestedObject);
+
+                    Assert.Equal(expectedValue[i], nestedValue);
+                }
 
                 values.Remove(name);
             }

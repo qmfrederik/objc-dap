@@ -158,6 +158,14 @@ namespace Objc.Dap.Runtime
             };
         }
 
+        public string? GetClassName(Objc2Object @object)
+        {
+            ArgumentNullException.ThrowIfNull(@object);
+
+            var @class = this.ReadClass(@object.Isa);
+            return this.GetClassName(@class);
+        }
+
         public string? GetClassName(Objc2Class objcClass)
         {
             if (objcClass == Objc2Class.Null)
