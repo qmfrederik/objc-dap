@@ -64,25 +64,6 @@ namespace ObjcDap.Tests
             }
         }
 
-        public static string GetTargetPath(string name)
-        {
-            return
-                Path.GetFullPath(
-                    Path.Combine(
-                    Environment.CurrentDirectory,
-                    $"../../../../../libobjcd/build/targets/{name}.exe"));
-        }
-
-        public static string GetSourcePath(string name)
-        {
-            return
-                Path.GetFullPath(
-                    Path.Combine(
-                    Environment.CurrentDirectory,
-                    $"../../../../../libobjcd/targets/",
-                    name));
-        }
-
         [Fact]
         public async Task SimpleTarget_CanReadVariables()
         {
@@ -111,7 +92,7 @@ namespace ObjcDap.Tests
                     new ObjcLaunchRequest()
                     {
                         Args = {
-                            Program = GetTargetPath("target"),
+                            Program = TestAssets.GetTargetPath("target"),
                             StopOnEntry = false,
                         }
                     },
@@ -125,7 +106,7 @@ namespace ObjcDap.Tests
                     {
                         Source = new Source()
                         {
-                            Path = GetSourcePath("target.m"),
+                            Path = TestAssets.GetSourcePath("target.m"),
                         },
                         Breakpoints = new List<SourceBreakpoint>()
                         {
