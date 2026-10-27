@@ -3,12 +3,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Nerdbank.Streams;
 using Objc.Dap;
+using Objc.Dap.Runtime;
 using System.Diagnostics;
 using System.Text;
 
 namespace ObjcDap.Tests
 {
-    internal class DapClient : IDisposable
+    internal class DapClient<T> : IDisposable
+        where T: DebugAdapterProxy
     {
         private readonly ITestOutputHelper outputHelper;
         private readonly MonitoringStream clientStream;
@@ -47,7 +49,9 @@ namespace ObjcDap.Tests
 
             var services = new ServiceCollection();
             services.AddLogging(s => s.AddXUnit(this.outputHelper));
-            services.AddSingleton<DebugAdapterProxy>();
+            services.AddSingleton<DebugAdapterProxy, T>();
+            services.AddSingleton<Objc2Runtime>();
+            services.AddSingleton(ProcessMemoryReader.Create());
             services.AddSingleton(new DebugAdapterOptions()
             {
                 Input = this.serverStream,

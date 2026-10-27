@@ -43,7 +43,7 @@ namespace ObjcDap.Tests
         [Fact]
         public async Task ConnectAndDisconnect_Works()
         {
-            using (var client = new DapClient(this.outputHelper))
+            using (var client = new DapClient<DebugAdapterProxy>(this.outputHelper))
             {
                 var task = client.Run(TestContext.Current.CancellationToken);
 
@@ -67,7 +67,7 @@ namespace ObjcDap.Tests
         [Fact]
         public async Task SimpleTarget_CanReadVariables()
         {
-            using (var client = new DapClient(this.outputHelper))
+            using (var client = new DapClient<DebugAdapterProxy>(this.outputHelper))
             {
                 var task = client.Run(TestContext.Current.CancellationToken);
                 var initializeResponse = client.Host.SendRequestSync(
