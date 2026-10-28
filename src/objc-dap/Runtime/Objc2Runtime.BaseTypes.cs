@@ -43,6 +43,11 @@ namespace Objc.Dap.Runtime
             var urlStringObject = this.ReadObject((nuint)urlStringAddress);
             var urlString = this.GetStringValue(urlStringObject);
 
+            if (urlString == null)
+            {
+                return null;
+            }
+
             return new Uri(urlString!);
         }
 

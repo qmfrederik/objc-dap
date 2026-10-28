@@ -163,7 +163,10 @@ namespace Objc.Dap.Runtime
 
         public string? GetClassName(Objc2Object @object)
         {
-            ArgumentNullException.ThrowIfNull(@object);
+            if (@object == Objc2Object.Null || @object.IsSmallObject)
+            {
+                return null;
+            }
 
             var @class = this.ReadClass(@object.Isa);
             return this.GetClassName(@class);

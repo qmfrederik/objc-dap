@@ -1,7 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Objc.Dap.Runtime;
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Diagnostics;
 
 namespace Objc.Dap
 {
@@ -91,7 +93,14 @@ namespace Objc.Dap
                 DefaultValueFactory = DefaultLddbDapPath,
             }.AcceptExistingOnly();
 
+            var breakOption = new Option<bool>("--break")
+            {
+                Description = "Break into the C# debugger on startup, allowing you to debug the objc-dap itself.",
+                Arity = ArgumentArity.ZeroOrOne,
+            };
+
             rootCommand.Options.Add(lldbDapPathOption);
+            rootCommand.Options.Add(breakOption);
             rootCommand.SetAction(RunAsync);
 
             rootCommand.Add(ToolVersionCommand());
@@ -103,6 +112,12 @@ namespace Objc.Dap
         {
             // Has an arity of exactly one, and a "accept existing only" validator, so this will never be null.
             var lldbPath = parseResult.GetValue<FileInfo>("lldb-dap-path")!;
+            var @break = parseResult.GetValue<bool>("--break");
+
+            if (@break)
+            {
+                Debugger.Launch();
+            }
 
             return RunAsync(
                 new DebugAdapterOptions()
@@ -121,7 +136,9 @@ namespace Objc.Dap
             ServiceCollection services = new ServiceCollection();
             services.AddLogging(l => l.AddDebug());
             services.AddSingleton(options);
-            services.AddSingleton<DebugAdapterProxy>();
+            services.AddSingleton(ProcessMemoryReader.Create());
+            services.AddSingleton<Objc2Runtime>();
+            services.AddSingleton<DebugAdapterProxy, Objc2DebugAdapterProxy>();
 
             using var provider = services.BuildServiceProvider();
             var proxy = provider.GetRequiredService<DebugAdapterProxy>();
