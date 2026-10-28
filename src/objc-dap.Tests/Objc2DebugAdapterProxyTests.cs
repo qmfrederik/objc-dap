@@ -28,17 +28,20 @@ namespace ObjcDap.Tests
 
                 var str = variables.SingleOrDefault(s => s.Name == "str");
                 Assert.NotNull(str);
-                Assert.Equal("NSString *", str.Type);
+                Assert.Equal("NSConstantString *", str.Type);
+                Assert.Equal("Hello, World!", str.Value);
                 Assert.Null(str.PresentationHint);
 
                 var dict = variables.SingleOrDefault(s => s.Name == "dict");
                 Assert.NotNull(dict);
-                Assert.Equal("NSDictionary *", dict.Type);
+                Assert.Equal("GSDictionary *", dict.Type);
+                Assert.StartsWith("0x", dict.Value);
                 Assert.Null(dict.PresentationHint);
 
                 var array = variables.SingleOrDefault(s => s.Name == "array");
                 Assert.NotNull(array);
-                Assert.Equal("NSArray *", array.Type);
+                Assert.Equal("GSInlineArray *", array.Type);
+                Assert.StartsWith("0x", array.Value);
                 Assert.Null(array.PresentationHint);
 
                 client.Host.SendRequestSync(new DisconnectRequest());

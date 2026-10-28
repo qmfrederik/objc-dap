@@ -117,8 +117,8 @@ namespace ObjcDap.Tests
                 new ObjcLaunchRequest()
                 {
                     Args = {
-                            Program = TestAssets.GetTargetPath(program),
-                            StopOnEntry = false,
+                        Program = TestAssets.GetTargetPath(program),
+                        StopOnEntry = false,
                     }
                 },
                 (a) => { },
