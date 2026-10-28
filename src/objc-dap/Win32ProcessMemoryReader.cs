@@ -40,13 +40,8 @@ namespace Objc.Dap
         public override unsafe int Read(nuint baseAddress, Span<byte> buffer)
         {
             Verify.NotDisposed(this);
+            this.EnsureProcessOpen();
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(baseAddress, (nuint)0, nameof(baseAddress));
-
-            if (this.handle == null)
-            {
-                throw new InvalidOperationException("Process is not open.");
-            }
-            ;
 
             if (!ReadProcessMemory(this.handle, (void*)baseAddress, buffer, out nuint bytesRead))
             {
@@ -59,6 +54,9 @@ namespace Objc.Dap
 
         public override unsafe bool IsDereferencableMemory(nuint baseAddress)
         {
+            Verify.NotDisposed(this);
+            this.EnsureProcessOpen();
+
             if (VirtualQueryEx(this.handle, (void*)baseAddress, out var memoryBasicInformation) == 0)
             {
                 var error = Marshal.GetLastWin32Error();
@@ -74,6 +72,14 @@ namespace Objc.Dap
             return (memoryBasicInformation.State == VIRTUAL_ALLOCATION_TYPE.MEM_COMMIT)
                 && !memoryBasicInformation.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_NOACCESS)
                 && !memoryBasicInformation.Protect.HasFlag(PAGE_PROTECTION_FLAGS.PAGE_GUARD);
+        }
+
+        private void EnsureProcessOpen()
+        {
+            if(this.handle == null)
+            {
+                throw new InvalidOperationException("Process is not open.");
+            }
         }
 
         /// <inheritdoc/>
