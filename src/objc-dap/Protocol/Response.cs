@@ -6,6 +6,7 @@ namespace Objc.Dap.Protocol
     [JsonDerivedType(typeof(VariablesResponse), VariablesResponse.CommandName)]
     public class Response : ProtocolMessage
     {
+        [JsonPropertyName("type")]
         public override ProtocolMessageType Type => ProtocolMessageType.Response;
 
         /// <summary>
@@ -37,6 +38,7 @@ namespace Objc.Dap.Protocol
         /// etc.
         /// </summary>
         [JsonPropertyName("message")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Message { get; set; }
     }
 }

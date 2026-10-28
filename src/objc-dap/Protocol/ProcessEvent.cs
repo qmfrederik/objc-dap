@@ -2,7 +2,7 @@
 
 namespace Objc.Dap.Protocol
 {
-    internal class ProcessEvent : Event
+    public class ProcessEvent : Event
     {
         public const string EventName = "process";
 

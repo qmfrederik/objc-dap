@@ -2,7 +2,7 @@
 
 namespace Objc.Dap.Protocol
 {
-    internal class VariablesResponseBody
+    public class VariablesResponseBody
     {
         [JsonPropertyName("variables")]
         public required Variable[] Variables { get; set; }

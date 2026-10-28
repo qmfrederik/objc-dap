@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Objc.Dap.Protocol
 {
-    internal class Variable
+    public class Variable
     {
         /// <summary>
         /// Gets or sets the variable's name.
@@ -40,6 +40,7 @@ namespace Objc.Dap.Protocol
         /// variable in the UI.
         /// </summary>
         [JsonPropertyName("presentationHint")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public VariablePresentationHint? PresentationHint { get; set; }
 
         /// <summary>
@@ -69,6 +70,7 @@ namespace Objc.Dap.Protocol
         /// and fetch them in chunks.
         /// </remarks>
         [JsonPropertyName("namedVariables")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int NamedVariables { get; set; }
 
         /// <summary>
@@ -79,6 +81,7 @@ namespace Objc.Dap.Protocol
         /// and fetch them in chunks.
         /// </remarks>
         [JsonPropertyName("indexedVariables")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int IndexedVariables { get; set; }
 
         /// <summary>
@@ -105,6 +108,7 @@ namespace Objc.Dap.Protocol
         /// 'Lifetime of Object References' in the Overview section for details.
         /// </remarks>
         [JsonPropertyName("declarationReference")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int DeclarationReference { get; set; }
 
         /// <summary>
@@ -119,6 +123,7 @@ namespace Objc.Dap.Protocol
         /// 'Lifetime of Object References' in the Overview section for details.
         /// </remarks>
         [JsonPropertyName("valueDeclarationReference")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int ValueDeclarationReference { get; set; }
     }
 }

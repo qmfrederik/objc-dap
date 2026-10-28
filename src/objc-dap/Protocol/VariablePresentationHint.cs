@@ -2,7 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Objc.Dap.Protocol
 {
-    internal class VariablePresentationHint
+    public class VariablePresentationHint
     {
         /// <summary>
         /// Gets or sets the kind of variable. Before introducing additional values, try to use the
