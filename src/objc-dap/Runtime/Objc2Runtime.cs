@@ -34,6 +34,8 @@ namespace Objc.Dap.Runtime
             this.readers.Add("GSRectValue", (obj) => this.GetRectValue(obj));
         }
 
+        public void Open(int processId) => this.processMemoryReader.Open(processId);
+
         public object? GetObjectValue(Objc2Object @object)
         {
             if (@object == Objc2Object.Null)
@@ -112,8 +114,9 @@ namespace Objc.Dap.Runtime
             }
 
             nuint isa = (nuint)BinaryPrimitives.ReadUInt64LittleEndian(buffer);
-            if (!this.processMemoryReader.IsDereferencableMemory(isa))
+            if (!this.ValidateClassHierarchy(isa))
             {
+                this.logger.LogWarning($"Address 0x{address:X} has an isa (0x{isa:X}) that is not a valid class.");
                 return Objc2Object.Null;
             }
 
