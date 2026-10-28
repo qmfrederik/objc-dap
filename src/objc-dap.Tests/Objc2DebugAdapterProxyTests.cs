@@ -35,13 +35,13 @@ namespace ObjcDap.Tests
                 var dict = variables.SingleOrDefault(s => s.Name == "dict");
                 Assert.NotNull(dict);
                 Assert.Equal("GSDictionary *", dict.Type);
-                Assert.StartsWith("0x", dict.Value);
+                Assert.StartsWith("<GSDictionary: 0x", dict.Value);
                 Assert.Null(dict.PresentationHint);
 
                 var array = variables.SingleOrDefault(s => s.Name == "array");
                 Assert.NotNull(array);
                 Assert.Equal("GSInlineArray *", array.Type);
-                Assert.StartsWith("0x", array.Value);
+                Assert.Equal("(item1, item2)", array.Value);
                 Assert.Null(array.PresentationHint);
 
                 client.Host.SendRequestSync(new DisconnectRequest());

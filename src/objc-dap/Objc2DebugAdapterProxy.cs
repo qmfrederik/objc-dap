@@ -58,11 +58,11 @@ namespace Objc.Dap
                             variable.Type = $"{className} *";
                         }
 
-                        var value = this.runtime.GetObjectValue(@object);
+                        var description = this.runtime.GetObjectDescription(@object);
 
-                        if (value != null)
+                        if (description != null)
                         {
-                            variable.Value = value.ToString()!;
+                            variable.Value = description;
                         }
                     }
                 }

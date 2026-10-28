@@ -9,6 +9,13 @@ namespace ObjcDap.Tests.Runtime
 {
     public class Objc2RuntimeTests
     {
+        private readonly ITestOutputHelper outputHelper;
+
+        public Objc2RuntimeTests(ITestOutputHelper outputHelper)
+        {
+            this.outputHelper = outputHelper ?? throw new ArgumentNullException(nameof(outputHelper));
+        }
+
         [Fact]
         public void SimpleTarget_CanReadVariables()
         {
@@ -64,6 +71,9 @@ namespace ObjcDap.Tests.Runtime
                 { "mutableString", "You can change me" },
             };
 
+            // Strings describe themselves.
+            var descriptions = new Dictionary<string, string?>(values);
+
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadStrings)))
             {
                 string? className = null;
@@ -79,6 +89,8 @@ namespace ObjcDap.Tests.Runtime
                 var value = Assert.IsType<string>(runtime.GetObjectValue(objcValue));
                 Assert.Equal(values[name], value);
                 values.Remove(name);
+
+                Assert.Equal(descriptions[name], runtime.GetObjectDescription(objcValue));
 
                 Assert.Equal(classNames[name], className);
                 classNames.Remove(name);
@@ -120,6 +132,20 @@ namespace ObjcDap.Tests.Runtime
                 { "doubleNumber", 2.718281828459045d },
             };
 
+            Dictionary<string, string> descriptions = new Dictionary<string, string>()
+            {
+                { "smallInt", "42" },
+                { "smallFloat", "3.14" },
+                { "smallRepeatingDouble", "1" },
+                { "smallExtendedDouble", "3.14" },
+                { "boolNumber", "1" },
+                { "reusedInt", "5" },
+                { "intNumber", "1234567890" },
+                { "longLongNumber", "5000000000" },
+                { "unsignedLongLongNumber", "18446744073709551615" },
+                { "doubleNumber", "2.718281828459045" },
+            };
+
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadNumbers)))
             {
                 string? className = null;
@@ -138,6 +164,7 @@ namespace ObjcDap.Tests.Runtime
                 var expectedValue = values[name]!;
                 var value = runtime.GetObjectValue(objcValue);
                 Assert.Equal(expectedValue, value);
+                Assert.Equal(descriptions[name], runtime.GetObjectDescription(objcValue));
 
                 values.Remove(name);
             }
@@ -168,6 +195,15 @@ namespace ObjcDap.Tests.Runtime
                 { "rect", new RectangleF(10f, 20f, 300f, 200f) },
             };
 
+            Dictionary<string, string> descriptions = new Dictionary<string, string>()
+            {
+                { "date", "2023-11-14 22:13:20 +0000" },
+                { "url", "https://example.com/path?query=1" },
+                { "point", "{x = 1.5; y = 2.5}" },
+                { "size", "{width = 640; height = 480}" },
+                { "rect", "{x = 10; y = 20; width = 300; height = 200}" },
+            };
+
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadBaseTypes)))
             {
                 string? className = null;
@@ -186,6 +222,7 @@ namespace ObjcDap.Tests.Runtime
                 var expectedValue = values[name]!;
                 var value = runtime.GetObjectValue(objcValue);
                 Assert.Equal(expectedValue, value);
+                Assert.Equal(descriptions[name], runtime.GetObjectDescription(objcValue));
 
                 values.Remove(name);
             }
@@ -210,6 +247,13 @@ namespace ObjcDap.Tests.Runtime
                 { "emptyArray", new object?[]{ } },
                 { "stringArray",new object?[]{ "one", "two", "three" }},
                 { "mutableArray", new object?[]{ "a", "b", "c", 42 } },
+            };
+
+            Dictionary<string, string> descriptions = new Dictionary<string, string>()
+            {
+                { "emptyArray", "()" },
+                { "stringArray", "(one, two, three)" },
+                { "mutableArray", "(a, b, c, 42)" },
             };
 
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
@@ -238,6 +282,8 @@ namespace ObjcDap.Tests.Runtime
 
                     Assert.Equal(expectedValue[i], nestedValue);
                 }
+
+                Assert.Equal(descriptions[name], runtime.GetObjectDescription(objcValue));
 
                 values.Remove(name);
             }
