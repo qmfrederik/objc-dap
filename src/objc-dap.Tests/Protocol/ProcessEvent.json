@@ -1,0 +1,12 @@
+﻿{
+  "body": {
+    "isLocalProcess": true,
+    "name": "C:\\Users\\fredcarl\\source\\repos\\objc-dap\\src\\libobjcd\\build\\targets\\target.exe",
+    "pointerSize": 64,
+    "startMethod": "launch",
+    "systemProcessId": 13744
+  },
+  "event": "process",
+  "seq": 140,
+  "type": "event"
+}

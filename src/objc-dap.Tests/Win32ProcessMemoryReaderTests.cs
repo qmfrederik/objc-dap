@@ -1,4 +1,6 @@
 ﻿using Objc.Dap;
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 
 namespace ObjcDap.Tests
@@ -13,16 +15,29 @@ namespace ObjcDap.Tests
         public void Open_ValidatesArguments()
         {
             using var reader = new Win32ProcessMemoryReader();
+            reader.Open(Process.GetCurrentProcess().Id);
             Assert.Throws<ArgumentOutOfRangeException>(() => reader.Open(0));
             Assert.Throws<ArgumentOutOfRangeException>(() => reader.Open(-1));
+        }
+
+        [WindowsFact]
+        public void NotOpen_ValidatesArguments()
+        {
+            using var reader = new Win32ProcessMemoryReader();
+            Assert.Throws<InvalidOperationException>(() => reader.Read(1, Span<byte>.Empty));
+            Assert.Throws<InvalidOperationException>(() => reader.IsDereferencableMemory(1));
         }
 
         [WindowsFact]
         public void Read_ValidatesArguments()
         {
             using var reader = new Win32ProcessMemoryReader();
-            Assert.Throws<ArgumentOutOfRangeException>(() => reader.Read(0, Span<byte>.Empty));
-            Assert.Throws<InvalidOperationException>(() => reader.Read(1, Span<byte>.Empty));
+            reader.Open(Process.GetCurrentProcess().Id);
+
+            Memory<byte> buffer = new byte[4];
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => reader.Read(0, buffer.Span));
+            Assert.Throws<Win32Exception>(() => reader.Read(1, buffer.Span));
         }
 
         [WindowsFact]

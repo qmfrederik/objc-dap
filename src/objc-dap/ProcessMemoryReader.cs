@@ -38,6 +38,8 @@ namespace Objc.Dap
             return BinaryPrimitives.ReadUInt64LittleEndian(dataPtrMemory);
         }
 
+        public bool IsAligned(ulong address) => (address & (nuint)(IntPtr.Size - 1)) == 0;
+
         public abstract bool IsDereferencableMemory(nuint baseAddress);
 
         /// <inheritdoc/>

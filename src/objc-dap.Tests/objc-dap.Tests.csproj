@@ -31,6 +31,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Update="Protocol\ProcessEvent.json">
+	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  </None>
 	  <None Update="Protocol\VariablesResponse.json">
 	    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 	  </None>
