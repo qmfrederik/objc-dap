@@ -17,6 +17,12 @@ namespace Objc.Dap.Runtime
         /// </summary>
         private bool ValidateClassHierarchy(nuint address)
         {
+            // A NUL pointer isn't a valid class hierarchy.
+            if (address == 0)
+            {
+                return false;
+            }
+
             var chain = new List<nuint>();
             nuint current = address;
 
