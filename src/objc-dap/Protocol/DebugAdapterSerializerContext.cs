@@ -5,6 +5,7 @@ namespace Objc.Dap.Protocol
     [JsonSourceGenerationOptions(AllowOutOfOrderMetadataProperties = true)]
     [JsonSerializable(typeof(ProtocolMessage))]
     [JsonSerializable(typeof(Request))]
+    [JsonSerializable(typeof(VariablesRequest))]
     [JsonSerializable(typeof(Response))]
     [JsonSerializable(typeof(Event))]
     public partial class DebugAdapterSerializerContext : JsonSerializerContext

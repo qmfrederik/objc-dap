@@ -95,6 +95,46 @@ namespace ObjcDap.Tests
         }
 
         [Fact]
+        public void VariablesRequest_UnknownReference_IsForwarded()
+        {
+            var harness = new Harness();
+
+            harness.Send(CreateVariablesRequest(7, 1));
+
+            Assert.Single(harness.Forwarded);
+            Assert.Empty(harness.Responses);
+        }
+
+        [Fact]
+        public void VariablesRequest_ExpiredReference_IsForwarded()
+        {
+            var harness = new Harness();
+            var reference = harness.References.Add(0x1000);
+            harness.Send(CreateRequest("next"));
+            harness.Forwarded.ToList();
+
+            harness.Send(CreateVariablesRequest(7, reference));
+
+            Assert.Single(harness.Forwarded);
+            Assert.Empty(harness.Responses);
+        }
+
+        [Fact]
+        public void VariablesRequest_OwnedReferenceToUnreadableObject_FailsWithoutForwarding()
+        {
+            var harness = new Harness();
+            var reference = harness.References.Add(0x1000);
+
+            harness.Send(CreateVariablesRequest(7, reference));
+
+            Assert.Empty(harness.Forwarded);
+            var response = Assert.IsType<VariablesResponse>(Assert.Single(harness.Responses).Payload);
+            Assert.False(response.Success);
+            Assert.Equal(7, response.RequestSequence);
+            Assert.NotNull(response.Message);
+        }
+
+        [Fact]
         public void Request_DeserializesCommand()
         {
             var request = JsonSerializer.Deserialize(
@@ -107,6 +147,9 @@ namespace ObjcDap.Tests
 
         private static string CreateRequest(string command) =>
             "{\"seq\":1,\"type\":\"request\",\"command\":\"" + command + "\",\"arguments\":{}}";
+
+        private static string CreateVariablesRequest(int seq, int reference) =>
+            "{\"seq\":" + seq + ",\"type\":\"request\",\"command\":\"variables\",\"arguments\":{\"variablesReference\":" + reference + "}}";
 
         private sealed class Harness
         {
@@ -136,18 +179,19 @@ namespace ObjcDap.Tests
 
             public VariableReferenceStore References { get; }
 
-            public IReadOnlyList<Message> Forwarded
-            {
-                get
-                {
-                    var messages = new List<Message>();
-                    while (this.target.TryDequeue(out var message))
-                    {
-                        messages.Add(message!);
-                    }
+            public IReadOnlyList<Message> Forwarded => Drain(this.target);
 
-                    return messages;
+            public IReadOnlyList<Message> Responses => Drain(this.proxy.Client);
+
+            private static List<Message> Drain(AsyncQueue<Message?> queue)
+            {
+                var messages = new List<Message>();
+                while (queue.TryDequeue(out var message))
+                {
+                    messages.Add(message!);
                 }
+
+                return messages;
             }
 
             public void Send(string json)
@@ -173,6 +217,8 @@ namespace ObjcDap.Tests
                 : base(options, runtime, references, NullLogger<DebugAdapterProxy>.Instance)
             {
             }
+
+            public AsyncQueue<Message?> Client => this.ClientQueue;
 
             public void Send(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target) =>
                 this.ProxyMessage(messageWithHeader, messageBytes, message, target);

@@ -185,5 +185,14 @@ namespace Objc.Dap.Runtime
             var className = System.Text.Encoding.UTF8.GetString(nameBuffer, 0, nameLength);
             return className;
         }
+
+        // Small objects have no isa; the class is implied by the tag.
+        public static string? GetSmallObjectClassName(SmallObjectType type) => type switch
+        {
+            SmallObjectType.String => "NSString",
+            SmallObjectType.Int or SmallObjectType.Float or SmallObjectType.ExtendedDouble or SmallObjectType.RepeatingDouble => "NSNumber",
+            SmallObjectType.Date => "NSDate",
+            _ => null,
+        };
     }
 }
