@@ -5,7 +5,7 @@ namespace Objc.Dap
     /// </summary>
     public class VariableReferenceStore
     {
-        // References issued by lldb-dap are small sequential integers; start well above them to avoid collisions.
+        // lldb-dap keeps its reference kind in the top byte (0 or 1); this range is never issued by it.
         public const int FirstReference = 0x40000000;
 
         private readonly Dictionary<int, nuint> references = new Dictionary<int, nuint>();

@@ -24,6 +24,11 @@ namespace Objc.Dap
         private readonly AsyncQueue<Message?> clientQueue = new AsyncQueue<Message?>();
 
         /// <summary>
+        /// Gets the queue of messages destined for the client.
+        /// </summary>
+        protected AsyncQueue<Message?> ClientQueue => this.clientQueue;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DebugAdapterProxy"/> class.
         /// </summary>
         /// <param name="options">The options to configure the debug adapter proxy.</param>

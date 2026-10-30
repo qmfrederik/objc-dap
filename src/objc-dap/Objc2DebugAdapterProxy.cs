@@ -34,6 +34,9 @@ namespace Objc.Dap
 
         private readonly VariableReferenceStore references;
 
+        // lldb-dap sequence numbers are small; clients correlate responses by request_seq.
+        private int sequence = VariableReferenceStore.FirstReference;
+
         public Objc2DebugAdapterProxy(DebugAdapterOptions options, Objc2Runtime runtime, VariableReferenceStore references, ILogger<DebugAdapterProxy> logger)
             : base(options, logger)
         {
@@ -48,6 +51,10 @@ namespace Objc.Dap
                 if (ReferenceInvalidatingCommands.Contains(request.Command))
                 {
                     this.InvalidateReferences();
+                }
+                else if (request.Command == VariablesResponse.CommandName && this.TryHandleVariablesRequest(messageBytes))
+                {
+                    return;
                 }
 
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
@@ -80,19 +87,7 @@ namespace Objc.Dap
                             continue;
                         }
 
-                        var className = this.runtime.GetClassName(@object);
-
-                        if (className != null)
-                        {
-                            variable.Type = $"{className} *";
-                        }
-
-                        var value = this.runtime.GetObjectValue(@object);
-
-                        if (value != null)
-                        {
-                            variable.Value = value.ToString()!;
-                        }
+                        this.Describe(variable, @object);
                     }
                 }
 
@@ -110,6 +105,113 @@ namespace Objc.Dap
         }
 
         private void InvalidateReferences() => this.references.Clear();
+
+        private void Describe(Variable variable, Objc2Object @object)
+        {
+            var className = this.runtime.GetClassName(@object) ?? Objc2Runtime.GetSmallObjectClassName(@object.SmallObjectType);
+
+            if (className != null)
+            {
+                variable.Type = $"{className} *";
+            }
+
+            var value = this.runtime.GetObjectValue(@object);
+
+            if (value != null)
+            {
+                variable.Value = value.ToString()!;
+            }
+
+            var count = this.runtime.GetIndexedVariablesCount(@object);
+
+            if (count >= 0)
+            {
+                variable.VariablesReference = this.references.Add(@object.Address);
+                variable.IndexedVariables = count;
+            }
+        }
+
+        // Returns true if the request referred to a proxy-owned reference and was answered here.
+        private bool TryHandleVariablesRequest(ReadOnlySequence<byte> messageBytes)
+        {
+            var reader = new Utf8JsonReader(messageBytes);
+            var request = JsonSerializer.Deserialize(ref reader, DebugAdapterSerializerContext.Default.VariablesRequest);
+
+            if (request?.Arguments == null || !this.references.TryGetAddress(request.Arguments.VariablesReference, out var address))
+            {
+                return false;
+            }
+
+            var response = this.CreateVariablesResponse(request, request.Arguments, address);
+            this.ClientQueue.Enqueue(this.CreateMessage(response, DebugAdapterSerializerContext.Default.Response));
+            return true;
+        }
+
+        private VariablesResponse CreateVariablesResponse(VariablesRequest request, VariablesArguments arguments, nuint address)
+        {
+            var response = new VariablesResponse()
+            {
+                Sequence = Interlocked.Increment(ref this.sequence),
+                RequestSequence = request.Sequence,
+                Success = true,
+                Body = new VariablesResponseBody() { Variables = [] },
+            };
+
+            var array = this.runtime.ReadObject(address);
+            var count = this.runtime.GetIndexedVariablesCount(array);
+
+            if (count < 0)
+            {
+                response.Success = false;
+                response.Message = "The object is no longer available.";
+                return response;
+            }
+
+            if (arguments.Filter == "named")
+            {
+                return response;
+            }
+
+            long start = Math.Clamp(arguments.Start ?? 0, 0, count);
+            long end = arguments.Count is > 0 ? Math.Min(count, start + arguments.Count.Value) : count;
+
+            var variables = new List<Variable>();
+            for (int i = (int)start; i < end; i++)
+            {
+                variables.Add(this.CreateElementVariable(array, i));
+            }
+
+            response.Body.Variables = variables.ToArray();
+            return response;
+        }
+
+        private Variable CreateElementVariable(Objc2Object array, int index)
+        {
+            var variable = new Variable()
+            {
+                Name = $"[{index}]",
+                Type = "id",
+                Value = "<unreadable>",
+            };
+
+            Objc2Object element;
+            try
+            {
+                element = this.runtime.GetIndexedVariable(array, index);
+            }
+            catch (InvalidOperationException)
+            {
+                return variable;
+            }
+
+            if (element != Objc2Object.Null)
+            {
+                variable.Value = $"0x{element.Address:X}";
+                this.Describe(variable, element);
+            }
+
+            return variable;
+        }
 
         private static ulong GetValueAddress(Variable variable)
         {
