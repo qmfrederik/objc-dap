@@ -352,6 +352,48 @@ namespace ObjcDap.Tests.Runtime
         }
 
         [Fact]
+        public void ObjcRuntime_CanReadInstanceVariableValues()
+        {
+            Dictionary<string, object?> expected = new Dictionary<string, object?>()
+            {
+                { "baseInt", 42 },
+                { "derivedDouble", 3.5 },
+                { "derivedString", "text" },
+                { "derivedChar", (sbyte)'x' },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadInstanceVariables)))
+            {
+                if (name != "derived")
+                {
+                    continue;
+                }
+
+                var derived = runtime.ReadObject((nuint)address);
+
+                foreach (var instanceVariable in runtime.GetInstanceVariables(derived))
+                {
+                    if (!expected.Remove(instanceVariable.Name, out var expectedValue))
+                    {
+                        continue;
+                    }
+
+                    var value = runtime.GetInstanceVariableValue(derived, instanceVariable);
+
+                    if (value is Objc2Object child)
+                    {
+                        value = runtime.GetObjectValue(child);
+                    }
+
+                    Assert.Equal(expectedValue, value);
+                }
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(expected);
+        }
+
+        [Fact]
         public void ObjcRuntime_NullAndSmallObjects_HaveNoInstanceVariables()
         {
             var runtime = new Objc2Runtime(

@@ -42,6 +42,7 @@ namespace Objc.Dap.Runtime
         private const int MaxIvarStride = 1024;
         private const int MaxIvarNameLength = 128;
         private const int MaxTypeEncodingLength = 512;
+        private const int MaxRawInstanceVariableBytes = 64;
 
         /// <summary>
         /// Gets the instance variables of <paramref name="object"/>, including the ones declared by its superclasses,
@@ -158,6 +159,90 @@ namespace Objc.Dap.Runtime
                     Offset = offset,
                     Size = size,
                 });
+            }
+        }
+
+        /// <summary>
+        /// Reads the value of <paramref name="instanceVariable"/> in <paramref name="object"/>, according to its type encoding.
+        /// </summary>
+        /// <returns>
+        /// A boxed <see cref="sbyte"/>, <see cref="byte"/>, <see cref="bool"/>, <see cref="short"/>, <see cref="ushort"/>,
+        /// <see cref="int"/>, <see cref="uint"/>, <see cref="long"/>, <see cref="ulong"/>, <see cref="float"/> or <see cref="double"/>
+        /// for scalars; an <see cref="Objc2Object"/> for objects (<see cref="Objc2Object.Null"/> if the pointer isn't a valid object);
+        /// an <see cref="Objc2Class"/> for classes; a <see cref="nuint"/> for other pointers; <see langword="null"/> for nil objects and classes;
+        /// and the leading bytes (at most 64) for anything else, such as structs.
+        /// </returns>
+        /// <exception cref="InvalidOperationException">The value could not be read.</exception>
+        public object? GetInstanceVariableValue(Objc2Object @object, Objc2InstanceVariable instanceVariable)
+        {
+            ArgumentNullException.ThrowIfNull(@object);
+            ArgumentNullException.ThrowIfNull(instanceVariable);
+
+            if (@object == Objc2Object.Null || @object.IsSmallObject)
+            {
+                throw new ArgumentException("The object must be a valid, non-small object.", nameof(@object));
+            }
+
+            try
+            {
+                return this.ReadInstanceVariableValue(@object.Address + (nuint)instanceVariable.Offset, instanceVariable);
+            }
+            catch (Win32Exception ex)
+            {
+                throw new InvalidOperationException($"Could not read the instance variable '{instanceVariable.Name}' of the object at 0x{@object.Address:X}.", ex);
+            }
+        }
+
+        private object? ReadInstanceVariableValue(nuint address, Objc2InstanceVariable instanceVariable)
+        {
+            var kind = instanceVariable.EncodingKind;
+
+            // Type encodings give 'l' and 'L' a fixed 32-bit size, unlike the C types.
+            int scalarSize = kind switch
+            {
+                'c' or 'C' or 'B' => 1,
+                's' or 'S' => 2,
+                'i' or 'I' or 'l' or 'L' or 'f' => 4,
+                'q' or 'Q' or 'd' => 8,
+                '@' or '#' or ':' or '*' or '^' => IntPtr.Size,
+                _ => 0,
+            };
+
+            if (scalarSize == 0 || instanceVariable.Size != scalarSize)
+            {
+                var raw = new byte[Math.Min(instanceVariable.Size, MaxRawInstanceVariableBytes)];
+                this.processMemoryReader.ReadExactly(address, raw);
+                return raw;
+            }
+
+            Span<byte> buffer = stackalloc byte[8];
+            var value = buffer.Slice(0, scalarSize);
+            this.processMemoryReader.ReadExactly(address, value);
+
+            switch (kind)
+            {
+                case 'c': return (sbyte)value[0];
+                case 'C': return value[0];
+                case 'B': return value[0] != 0;
+                case 's': return BinaryPrimitives.ReadInt16LittleEndian(value);
+                case 'S': return BinaryPrimitives.ReadUInt16LittleEndian(value);
+                case 'i':
+                case 'l': return BinaryPrimitives.ReadInt32LittleEndian(value);
+                case 'I':
+                case 'L': return BinaryPrimitives.ReadUInt32LittleEndian(value);
+                case 'f': return BinaryPrimitives.ReadSingleLittleEndian(value);
+                case 'q': return BinaryPrimitives.ReadInt64LittleEndian(value);
+                case 'Q': return BinaryPrimitives.ReadUInt64LittleEndian(value);
+                case 'd': return BinaryPrimitives.ReadDoubleLittleEndian(value);
+            }
+
+            var pointer = (nuint)BinaryPrimitives.ReadUInt64LittleEndian(value);
+
+            switch (kind)
+            {
+                case '@': return pointer == 0 ? null : this.ReadObject(pointer);
+                case '#': return pointer == 0 ? null : this.ReadClass(pointer);
+                default: return pointer;
             }
         }
 

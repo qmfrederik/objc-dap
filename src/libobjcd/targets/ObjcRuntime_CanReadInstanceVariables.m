@@ -32,7 +32,10 @@ static void printOffset(const char *name)
 int main()
 {
     Derived *derived = [Derived new];
+    derived->baseInt = 42;
+    derived->derivedDouble = 3.5;
     derived->derivedString = @"text";
+    derived->derivedChar = 'x';
 
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
