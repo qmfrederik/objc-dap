@@ -247,6 +247,70 @@ namespace ObjcDap.Tests.Runtime
             Assert.Empty(values);
         }
 
+        [Fact]
+        public void ObjcRuntime_CanReadDictionary()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "emptyDictionary", "GSDictionary" },
+                { "stringDictionary", "GSDictionary" },
+                { "mutableDictionary", "GSMutableDictionary" },
+            };
+
+            Dictionary<string, Dictionary<string, object?>> values = new Dictionary<string, Dictionary<string, object?>>()
+            {
+                { "emptyDictionary", new Dictionary<string, object?>() },
+                { "stringDictionary", new Dictionary<string, object?>() { { "one", "uno" }, { "two", "dos" }, { "three", "tres" } } },
+                { "mutableDictionary", Enumerable.Range(0, 20).ToDictionary(i => $"key{i}", i => (object?)(i * 10)) },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadDictionary)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                var expectedValue = values[name];
+                var count = runtime.GetNamedVariablesCount(objcValue);
+                Assert.Equal(expectedValue.Count, count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    (var key, var nestedObject) = runtime.GetNamedVariable(objcValue, i);
+
+                    Assert.Contains(key, expectedValue.Keys);
+                    Assert.Equal(expectedValue[key], runtime.GetObjectValue(nestedObject));
+                    expectedValue.Remove(key);
+                }
+
+                Assert.Empty(expectedValue);
+                values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
+        public void ObjcRuntime_NonDictionary_HasNoNamedVariables()
+        {
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
+            {
+                var objcValue = runtime.ReadObject((nuint)address);
+                Assert.Equal(-1, runtime.GetNamedVariablesCount(objcValue));
+            }
+        }
+
         private IEnumerable<(Objc2Runtime runtime, string variableName, ulong adddress)> ReadLines(string testName)
         {
             var psi = new ProcessStartInfo()
