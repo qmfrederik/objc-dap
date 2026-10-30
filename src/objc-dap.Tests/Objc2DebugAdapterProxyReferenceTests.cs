@@ -1,0 +1,181 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.VisualStudio.Threading;
+using Moq;
+using Objc.Dap;
+using Objc.Dap.Protocol;
+using Objc.Dap.Runtime;
+using System.Buffers;
+using System.Text;
+using System.Text.Json;
+
+namespace ObjcDap.Tests
+{
+    public class Objc2DebugAdapterProxyReferenceTests
+    {
+        public static TheoryData<string> InvalidatingCommands => new TheoryData<string>
+        {
+            "continue",
+            "next",
+            "stepIn",
+            "stepOut",
+            "stepBack",
+            "reverseContinue",
+            "restartFrame",
+            "goto",
+            "restart",
+            "terminate",
+            "disconnect",
+        };
+
+        public static TheoryData<string> NonInvalidatingCommands => new TheoryData<string>
+        {
+            "initialize",
+            "launch",
+            "setBreakpoints",
+            "configurationDone",
+            "threads",
+            "stackTrace",
+            "scopes",
+            "variables",
+            "evaluate",
+            "pause",
+        };
+
+        [Theory]
+        [MemberData(nameof(InvalidatingCommands))]
+        public void Request_ResumingOrEndingSession_InvalidatesReferences(string command)
+        {
+            var harness = new Harness();
+            var reference = harness.References.Add(0x1000);
+
+            harness.Send(CreateRequest(command));
+
+            Assert.Equal(0, harness.References.Count);
+            Assert.False(harness.References.TryGetAddress(reference, out _));
+        }
+
+        [Theory]
+        [MemberData(nameof(NonInvalidatingCommands))]
+        public void Request_NotResuming_KeepsReferences(string command)
+        {
+            var harness = new Harness();
+            var reference = harness.References.Add(0x1000);
+
+            harness.Send(CreateRequest(command));
+
+            Assert.Equal(1, harness.References.Count);
+            Assert.True(harness.References.TryGetAddress(reference, out var address));
+            Assert.Equal((nuint)0x1000, address);
+        }
+
+        [Fact]
+        public void ProcessEvent_InvalidatesReferencesAndOpensProcess()
+        {
+            var harness = new Harness();
+            harness.References.Add(0x1000);
+
+            harness.Send("""{"seq":1,"type":"event","event":"process","body":{"name":"target","systemProcessId":1234}}""");
+
+            Assert.Equal(0, harness.References.Count);
+            harness.Reader.Verify(r => r.Open(1234), Times.Once);
+        }
+
+        [Fact]
+        public void Request_IsForwardedUnchanged()
+        {
+            var harness = new Harness();
+            var json = CreateRequest("next");
+
+            harness.Send(json);
+
+            var message = Assert.Single(harness.Forwarded);
+            var expected = Encoding.UTF8.GetBytes($"Content-Length: {Encoding.UTF8.GetByteCount(json)}\r\n\r\n{json}");
+            Assert.Equal(expected, message.Value.ToArray());
+            Assert.Equal(ProtocolMessageType.Request, message.Type);
+        }
+
+        [Fact]
+        public void Request_DeserializesCommand()
+        {
+            var request = JsonSerializer.Deserialize(
+                CreateRequest("stepIn"),
+                DebugAdapterSerializerContext.Default.Request);
+
+            Assert.NotNull(request);
+            Assert.Equal("stepIn", request.Command);
+        }
+
+        private static string CreateRequest(string command) =>
+            "{\"seq\":1,\"type\":\"request\",\"command\":\"" + command + "\",\"arguments\":{}}";
+
+        private sealed class Harness
+        {
+            private readonly TestProxy proxy;
+            private readonly AsyncQueue<Message?> target = new AsyncQueue<Message?>();
+
+            public Harness()
+            {
+                this.Reader = new Mock<ProcessMemoryReader>();
+                this.References = new VariableReferenceStore();
+
+                var options = new DebugAdapterOptions()
+                {
+                    LldbDapPath = new FileInfo("lldb-dap"),
+                    Input = Stream.Null,
+                    Output = Stream.Null,
+                    Error = Stream.Null,
+                };
+
+                this.proxy = new TestProxy(
+                    options,
+                    new Objc2Runtime(this.Reader.Object, NullLogger<Objc2Runtime>.Instance),
+                    this.References);
+            }
+
+            public Mock<ProcessMemoryReader> Reader { get; }
+
+            public VariableReferenceStore References { get; }
+
+            public IReadOnlyList<Message> Forwarded
+            {
+                get
+                {
+                    var messages = new List<Message>();
+                    while (this.target.TryDequeue(out var message))
+                    {
+                        messages.Add(message!);
+                    }
+
+                    return messages;
+                }
+            }
+
+            public void Send(string json)
+            {
+                var message = Encoding.UTF8.GetBytes(json);
+                var withHeader = Encoding.UTF8.GetBytes($"Content-Length: {message.Length}\r\n\r\n{json}");
+
+                var protocolMessage = JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.ProtocolMessage)!;
+                protocolMessage = protocolMessage.Type switch
+                {
+                    ProtocolMessageType.Request => JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.Request)!,
+                    ProtocolMessageType.Event => JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.Event)!,
+                    _ => protocolMessage,
+                };
+
+                this.proxy.Send(new ReadOnlySequence<byte>(withHeader), new ReadOnlySequence<byte>(message), protocolMessage, this.target);
+            }
+        }
+
+        private sealed class TestProxy : Objc2DebugAdapterProxy
+        {
+            public TestProxy(DebugAdapterOptions options, Objc2Runtime runtime, VariableReferenceStore references)
+                : base(options, runtime, references, NullLogger<DebugAdapterProxy>.Instance)
+            {
+            }
+
+            public void Send(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target) =>
+                this.ProxyMessage(messageWithHeader, messageBytes, message, target);
+        }
+    }
+}

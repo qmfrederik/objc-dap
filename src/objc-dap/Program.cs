@@ -138,6 +138,7 @@ namespace Objc.Dap
             services.AddSingleton(options);
             services.AddSingleton(ProcessMemoryReader.Create());
             services.AddSingleton<Objc2Runtime>();
+            services.AddSingleton<VariableReferenceStore>();
             services.AddSingleton<DebugAdapterProxy, Objc2DebugAdapterProxy>();
 
             using var provider = services.BuildServiceProvider();
