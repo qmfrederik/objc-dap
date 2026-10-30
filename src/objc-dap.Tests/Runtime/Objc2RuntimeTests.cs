@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 using Objc.Dap;
 using Objc.Dap.Runtime;
 using System.Diagnostics;
@@ -309,6 +310,57 @@ namespace ObjcDap.Tests.Runtime
                 var objcValue = runtime.ReadObject((nuint)address);
                 Assert.Equal(-1, runtime.GetNamedVariablesCount(objcValue));
             }
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanReadInstanceVariables()
+        {
+            // Offsets come from the runtime's own ivar_getOffset in the target.
+            Dictionary<string, (string Encoding, uint Size)> expected = new Dictionary<string, (string Encoding, uint Size)>()
+            {
+                { "baseInt", ("i", 4) },
+                { "derivedDouble", ("d", 8) },
+                { "derivedString", ("@", 8) },
+                { "derivedChar", ("c", 1) },
+            };
+
+            IReadOnlyList<Objc2InstanceVariable>? instanceVariables = null;
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadInstanceVariables)))
+            {
+                if (name == "derived")
+                {
+                    instanceVariables = runtime.GetInstanceVariables(runtime.ReadObject((nuint)address));
+                    continue;
+                }
+
+                Assert.NotNull(instanceVariables);
+                var instanceVariable = Assert.Single(instanceVariables, v => v.Name == name);
+
+                Assert.Equal((int)address, instanceVariable.Offset);
+                Assert.StartsWith(expected[name].Encoding, instanceVariable.TypeEncoding);
+                Assert.Equal(expected[name].Size, instanceVariable.Size);
+                expected.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(expected);
+
+            // Superclass instance variables come first.
+            var names = instanceVariables!.Select(v => v.Name).ToList();
+            Assert.True(names.IndexOf("baseInt") < names.IndexOf("derivedDouble"));
+        }
+
+        [Fact]
+        public void ObjcRuntime_NullAndSmallObjects_HaveNoInstanceVariables()
+        {
+            var runtime = new Objc2Runtime(
+                Mock.Of<ProcessMemoryReader>(),
+                NullLogger<Objc2Runtime>.Instance);
+
+            Assert.Empty(runtime.GetInstanceVariables(Objc2Object.Null));
+            Assert.Empty(runtime.GetInstanceVariables(new Objc2Object() { Address = 0x3 }));
+            Assert.Throws<ArgumentNullException>(() => runtime.GetInstanceVariables(null!));
         }
 
         private IEnumerable<(Objc2Runtime runtime, string variableName, ulong adddress)> ReadLines(string testName)
