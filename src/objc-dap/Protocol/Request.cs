@@ -6,5 +6,8 @@ namespace Objc.Dap.Protocol
     {
         [JsonPropertyName("type")]
         public override ProtocolMessageType Type => ProtocolMessageType.Request;
+
+        [JsonPropertyName("command")]
+        public string Command { get; set; } = string.Empty;
     }
 }

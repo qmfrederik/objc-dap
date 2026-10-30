@@ -12,21 +12,50 @@ namespace Objc.Dap
 {
     public class Objc2DebugAdapterProxy : DebugAdapterProxy
     {
+        // Requests after which the debuggee runs or goes away, ending the lifetime of variable references.
+        private static readonly HashSet<string> ReferenceInvalidatingCommands = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "continue",
+            "next",
+            "stepIn",
+            "stepOut",
+            "stepBack",
+            "reverseContinue",
+            "restartFrame",
+            "goto",
+            "restart",
+            "terminate",
+            "disconnect",
+        };
+
         private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
 
         private readonly Objc2Runtime runtime;
 
-        public Objc2DebugAdapterProxy(DebugAdapterOptions options, Objc2Runtime runtime, ILogger<DebugAdapterProxy> logger)
+        private readonly VariableReferenceStore references;
+
+        public Objc2DebugAdapterProxy(DebugAdapterOptions options, Objc2Runtime runtime, VariableReferenceStore references, ILogger<DebugAdapterProxy> logger)
             : base(options, logger)
         {
             this.runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
+            this.references = references ?? throw new ArgumentNullException(nameof(references));
         }
 
         protected override void ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target)
         {
-            if (message is ProcessEvent)
+            if (message is Request request)
+            {
+                if (ReferenceInvalidatingCommands.Contains(request.Command))
+                {
+                    this.InvalidateReferences();
+                }
+
+                base.ProxyMessage(messageWithHeader, messageBytes, message, target);
+            }
+            else if (message is ProcessEvent)
             {
                 var processEvent = (ProcessEvent)message;
+                this.InvalidateReferences();
                 this.runtime.Open(processEvent.Body.SystemProcessId!.Value);
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
             }
@@ -79,6 +108,8 @@ namespace Objc.Dap
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
             }
         }
+
+        private void InvalidateReferences() => this.references.Clear();
 
         private static ulong GetValueAddress(Variable variable)
         {

@@ -52,6 +52,7 @@ namespace ObjcDap.Tests
             services.AddLogging(s => s.AddXUnit(this.outputHelper));
             services.AddSingleton<DebugAdapterProxy, T>();
             services.AddSingleton<Objc2Runtime>();
+            services.AddSingleton<VariableReferenceStore>();
             services.AddSingleton(ProcessMemoryReader.Create());
             services.AddSingleton(new DebugAdapterOptions()
             {
