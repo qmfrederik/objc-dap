@@ -98,5 +98,47 @@ namespace ObjcDap.Tests
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
             }
         }
+
+        [Fact]
+        public async Task SimpleTarget_CanReadInstanceVariables()
+        {
+            using (var client = new DapClient<DebugAdapterProxy>(this.outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadInstanceVariables",
+                    file: "SimpleTarget_CanReadInstanceVariables.m",
+                    line: 19,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+
+                var person = variables.Single(s => s.Name == "person");
+                Assert.Equal("Person *", person.Type);
+                Assert.True(person.VariablesReference > 0);
+
+                var members = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = person.VariablesReference,
+                    }).Variables;
+
+                var instanceVariables = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = members.Single(s => s.Name == "(anonymous)").VariablesReference,
+                    }).Variables;
+
+                var age = instanceVariables.Single(s => s.Name == "age");
+                Assert.Equal("int", age.Type);
+
+                var name = instanceVariables.Single(s => s.Name == "name");
+                Assert.Equal("NSString *", name.Type);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
     }
 }
