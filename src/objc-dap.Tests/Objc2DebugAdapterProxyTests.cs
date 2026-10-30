@@ -51,6 +51,51 @@ namespace ObjcDap.Tests
         }
 
         [Fact]
+        public async Task SimpleTarget_CanExpandDictionary()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "target",
+                    file: "target.m",
+                    line: 8,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+                var dict = variables.Single(s => s.Name == "dict");
+
+                Assert.True(dict.VariablesReference > 0);
+                Assert.Equal(1, dict.NamedVariables);
+                Assert.Null(dict.IndexedVariables);
+
+                var entries = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = dict.VariablesReference,
+                    }).Variables;
+
+                var entry = Assert.Single(entries);
+                Assert.Equal("key", entry.Name);
+                Assert.Equal("NSString *", entry.Type);
+                Assert.Equal("value", entry.Value);
+
+                var indexed = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = dict.VariablesReference,
+                        Filter = VariablesArguments.FilterValue.Indexed,
+                    }).Variables;
+
+                Assert.Empty(indexed);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Fact]
         public async Task SimpleTarget_CanExpandArray()
         {
             using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))

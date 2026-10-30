@@ -122,12 +122,14 @@ namespace Objc.Dap
                 variable.Value = value.ToString()!;
             }
 
-            var count = this.runtime.GetIndexedVariablesCount(@object);
+            var indexedCount = this.runtime.GetIndexedVariablesCount(@object);
+            var namedCount = this.runtime.GetNamedVariablesCount(@object);
 
-            if (count >= 0)
+            if (indexedCount >= 0 || namedCount >= 0)
             {
                 variable.VariablesReference = this.references.Add(@object.Address);
-                variable.IndexedVariables = count;
+                variable.IndexedVariables = Math.Max(indexedCount, 0);
+                variable.NamedVariables = Math.Max(namedCount, 0);
             }
         }
 
@@ -157,57 +159,89 @@ namespace Objc.Dap
                 Body = new VariablesResponseBody() { Variables = [] },
             };
 
-            var array = this.runtime.ReadObject(address);
-            var count = this.runtime.GetIndexedVariablesCount(array);
+            var container = this.runtime.ReadObject(address);
+            var indexedCount = this.runtime.GetIndexedVariablesCount(container);
+            var namedCount = this.runtime.GetNamedVariablesCount(container);
 
-            if (count < 0)
+            if (indexedCount < 0 && namedCount < 0)
             {
                 response.Success = false;
                 response.Message = "The object is no longer available.";
                 return response;
             }
 
-            if (arguments.Filter == "named")
+            var variables = new List<Variable>();
+
+            if (arguments.Filter != "named")
             {
-                return response;
+                (int start, int end) = GetPage(arguments, indexedCount);
+                for (int i = start; i < end; i++)
+                {
+                    variables.Add(this.ReadIndexedVariable(container, i));
+                }
             }
 
-            long start = Math.Clamp(arguments.Start ?? 0, 0, count);
-            long end = arguments.Count is > 0 ? Math.Min(count, start + arguments.Count.Value) : count;
-
-            var variables = new List<Variable>();
-            for (int i = (int)start; i < end; i++)
+            if (arguments.Filter != "indexed")
             {
-                variables.Add(this.CreateElementVariable(array, i));
+                (int start, int end) = GetPage(arguments, namedCount);
+                for (int i = start; i < end; i++)
+                {
+                    variables.Add(this.ReadNamedVariable(container, i));
+                }
             }
 
             response.Body.Variables = variables.ToArray();
             return response;
         }
 
-        private Variable CreateElementVariable(Objc2Object array, int index)
+        private static (int Start, int End) GetPage(VariablesArguments arguments, int total)
+        {
+            total = Math.Max(total, 0);
+            int start = Math.Clamp(arguments.Start ?? 0, 0, total);
+            long end = arguments.Count is > 0 ? Math.Min(total, (long)start + arguments.Count.Value) : total;
+            return (start, (int)end);
+        }
+
+        private Variable ReadIndexedVariable(Objc2Object array, int index)
+        {
+            var name = $"[{index}]";
+
+            try
+            {
+                return this.CreateChildVariable(name, this.runtime.GetIndexedVariable(array, index));
+            }
+            catch (InvalidOperationException)
+            {
+                return this.CreateChildVariable(name, Objc2Object.Null);
+            }
+        }
+
+        private Variable ReadNamedVariable(Objc2Object dictionary, int index)
+        {
+            try
+            {
+                (var name, var value) = this.runtime.GetNamedVariable(dictionary, index);
+                return this.CreateChildVariable(name, value);
+            }
+            catch (InvalidOperationException)
+            {
+                return this.CreateChildVariable($"[{index}]", Objc2Object.Null);
+            }
+        }
+
+        private Variable CreateChildVariable(string name, Objc2Object child)
         {
             var variable = new Variable()
             {
-                Name = $"[{index}]",
+                Name = name,
                 Type = "id",
                 Value = "<unreadable>",
             };
 
-            Objc2Object element;
-            try
+            if (child != Objc2Object.Null)
             {
-                element = this.runtime.GetIndexedVariable(array, index);
-            }
-            catch (InvalidOperationException)
-            {
-                return variable;
-            }
-
-            if (element != Objc2Object.Null)
-            {
-                variable.Value = $"0x{element.Address:X}";
-                this.Describe(variable, element);
+                variable.Value = $"0x{child.Address:X}";
+                this.Describe(variable, child);
             }
 
             return variable;
