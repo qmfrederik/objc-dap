@@ -29,6 +29,11 @@ namespace Objc.Dap
         protected AsyncQueue<Message?> ClientQueue => this.clientQueue;
 
         /// <summary>
+        /// Gets the queue of messages destined for <c>lldb-dap</c>.
+        /// </summary>
+        protected AsyncQueue<Message?> ServerQueue => this.serverQueue;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DebugAdapterProxy"/> class.
         /// </summary>
         /// <param name="options">The options to configure the debug adapter proxy.</param>

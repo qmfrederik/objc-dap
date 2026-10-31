@@ -137,6 +137,35 @@ namespace ObjcDap.Tests
         }
 
         [Fact]
+        public async Task SimpleTarget_CanEvaluateObjectWithInstanceVariables()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadInstanceVariables",
+                    file: "SimpleTarget_CanReadInstanceVariables.m",
+                    line: 19,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var frameId = client.Host.SendRequestSync(new StackTraceRequest() { ThreadId = stoppedDetails.ThreadId!.Value }).StackFrames[0].Id;
+
+                var person = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "person", FrameId = frameId, Context = EvaluateArguments.ContextValue.Hover });
+                Assert.Equal("Person *", person.Type);
+                Assert.StartsWith("<Person: 0x", person.Result);
+                Assert.True(person.VariablesReference >= VariableReferenceStore.FirstReference);
+
+                var instanceVariables = client.Host.SendRequestSync(new VariablesRequest() { VariablesReference = person.VariablesReference }).Variables;
+                Assert.Equal("42", instanceVariables.Single(v => v.Name == "age").Value);
+                Assert.Equal("Douglas Adams", instanceVariables.Single(v => v.Name == "name").Value);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Fact]
         public async Task SimpleTarget_CanExpandConstantString()
         {
             using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
@@ -418,6 +447,77 @@ namespace ObjcDap.Tests
                     Assert.Equal(0, variable.NamedVariables ?? 0);
                     Assert.True(variable.VariablesReference < VariableReferenceStore.FirstReference, "The proxy must not hand out a reference for an empty collection.");
                 }
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        private static EvaluateArguments.ContextValue ToContext(string context) => context switch
+        {
+            "hover" => EvaluateArguments.ContextValue.Hover,
+            "watch" => EvaluateArguments.ContextValue.Watch,
+            "repl" => EvaluateArguments.ContextValue.Repl,
+            "clipboard" => EvaluateArguments.ContextValue.Clipboard,
+            _ => throw new ArgumentOutOfRangeException(nameof(context)),
+        };
+
+        [Theory]
+        [InlineData("hover")]
+        [InlineData("watch")]
+        public async Task SimpleTarget_CanEvaluateObjects(string context)
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "target",
+                    file: "target.m",
+                    line: 8,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var frameId = client.Host.SendRequestSync(new StackTraceRequest() { ThreadId = stoppedDetails.ThreadId!.Value }).StackFrames[0].Id;
+
+                var str = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "str", FrameId = frameId, Context = ToContext(context) });
+                Assert.Equal("NSConstantString *", str.Type);
+                Assert.Equal("Hello, World!", str.Result);
+
+                var array = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "array", FrameId = frameId, Context = ToContext(context) });
+                Assert.Equal("GSInlineArray *", array.Type);
+                Assert.Equal("GSInlineArray <2 items>", array.Result);
+                Assert.True(array.VariablesReference >= VariableReferenceStore.FirstReference);
+                Assert.Equal(2, array.IndexedVariables);
+
+                // The result can be expanded like any other variable.
+                var elements = client.Host.SendRequestSync(new VariablesRequest() { VariablesReference = array.VariablesReference }).Variables;
+                Assert.Equal(["item1", "item2"], elements.Select(e => e.Value));
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Theory]
+        [InlineData("repl")]
+        [InlineData("clipboard")]
+        public async Task SimpleTarget_LeavesOtherEvaluateContextsAlone(string context)
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "target",
+                    file: "target.m",
+                    line: 8,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var frameId = client.Host.SendRequestSync(new StackTraceRequest() { ThreadId = stoppedDetails.ThreadId!.Value }).StackFrames[0].Id;
+
+                var array = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "array", FrameId = frameId, Context = ToContext(context) });
+                Assert.Equal("NSArray *", array.Type);
+                Assert.DoesNotContain("items", array.Result);
 
                 client.Host.SendRequestSync(new DisconnectRequest());
 

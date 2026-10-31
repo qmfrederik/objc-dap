@@ -35,6 +35,11 @@ namespace Objc.Dap
 
         private readonly VariableReferenceStore references;
 
+        // The sequence numbers of the evaluate requests whose results are shown as variables. Requests and responses
+        // are proxied on different threads.
+        private readonly HashSet<int> evaluateRequests = new HashSet<int>();
+        private readonly Lock evaluateRequestsLock = new Lock();
+
         // lldb-dap sequence numbers are small; clients correlate responses by request_seq.
         private int sequence = VariableReferenceStore.FirstReference;
 
@@ -57,6 +62,10 @@ namespace Objc.Dap
                 {
                     return;
                 }
+                else if (request.Command == EvaluateRequest.CommandName)
+                {
+                    this.TrackEvaluateRequest(messageBytes);
+                }
 
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
             }
@@ -66,6 +75,22 @@ namespace Objc.Dap
                 this.InvalidateReferences();
                 this.runtime.Open(processEvent.Body.SystemProcessId!.Value);
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
+            }
+            else if (message is EvaluateResponse evaluateResponse)
+            {
+                // Only the responses to hover and watch requests are tracked.
+                if (this.TryUntrackEvaluateRequest(evaluateResponse.RequestSequence)
+                    && evaluateResponse.Success
+                    && evaluateResponse.Body != null
+                    && this.TryDescribe(evaluateResponse.Body.Type, evaluateResponse.Body.Result, out var description))
+                {
+                    description.ApplyTo(evaluateResponse.Body);
+                    target.Enqueue(this.CreateMessage(evaluateResponse, DebugAdapterSerializerContext.Default.Response));
+                }
+                else
+                {
+                    base.ProxyMessage(messageWithHeader, messageBytes, message, target);
+                }
             }
             else if (message is VariablesResponse)
             {
@@ -173,6 +198,29 @@ namespace Objc.Dap
                 IndexedVariables = Math.Max(info.IndexedVariablesCount, 0),
                 NamedVariables = Math.Max(info.NamedVariablesCount, 0),
             };
+        }
+
+        private void TrackEvaluateRequest(ReadOnlySequence<byte> messageBytes)
+        {
+            var reader = new Utf8JsonReader(messageBytes);
+            var request = JsonSerializer.Deserialize(ref reader, DebugAdapterSerializerContext.Default.EvaluateRequest);
+
+            // Hover and watch show the result as a variable. The repl shows it as text, and clipboard needs it unchanged.
+            if (request?.Arguments?.Context is EvaluateArguments.HoverContext or EvaluateArguments.WatchContext)
+            {
+                lock (this.evaluateRequestsLock)
+                {
+                    this.evaluateRequests.Add(request.Sequence);
+                }
+            }
+        }
+
+        private bool TryUntrackEvaluateRequest(int sequence)
+        {
+            lock (this.evaluateRequestsLock)
+            {
+                return this.evaluateRequests.Remove(sequence);
+            }
         }
 
         // Returns true if the request referred to a proxy-owned reference and was answered here.
