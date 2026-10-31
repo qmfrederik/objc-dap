@@ -154,12 +154,20 @@ namespace Objc.Dap
             var indexedCount = this.runtime.GetIndexedVariablesCount(@object);
             var namedCount = this.runtime.GetNamedVariablesCount(@object);
 
+            // Collections have no value of their own, so summarize them with their class and size.
+            var itemCount = Math.Max(indexedCount, namedCount);
+            if (value == null && itemCount >= 0 && className != null)
+            {
+                variable.Value = $"{className} <{itemCount} {(itemCount == 1 ? "item" : "items")}>";
+            }
+
             if (indexedCount < 0 && namedCount < 0)
             {
                 namedCount = this.TryGetInstanceVariables(@object)?.Count ?? -1;
             }
 
-            if (indexedCount >= 0 || namedCount >= 0)
+            // An empty collection has nothing to expand.
+            if (itemCount != 0 && (indexedCount >= 0 || namedCount >= 0))
             {
                 variable.VariablesReference = this.references.Add(@object.Address);
                 variable.IndexedVariables = Math.Max(indexedCount, 0);
