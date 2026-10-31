@@ -10,6 +10,7 @@ int main()
     NSValue *point = [NSValue valueWithPoint:NSMakePoint(1.5, 2.5)];
     NSValue *size = [NSValue valueWithSize:NSMakeSize(640, 480)];
     NSValue *rect = [NSValue valueWithRect:NSMakeRect(10, 20, 300, 200)];
+    NSValue *range = [NSValue valueWithRange:NSMakeRange(5, 10)];
 
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -19,6 +20,7 @@ int main()
     printf("point: 0x%p\n", point);
     printf("size: 0x%p\n", size);
     printf("rect: 0x%p\n", rect);
+    printf("range: 0x%p\n", range);
     printf("---\n");
 
     getchar();
