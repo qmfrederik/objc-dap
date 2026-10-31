@@ -29,6 +29,10 @@ namespace Objc.Dap.Runtime
             this.readers.Add("GSCInlineString", this.GetGSCInlineStringValue);
             this.readers.Add("GSMutableString", this.GetGSCInlineStringValue);
             this.readers.Add("NSURL", this.GetUriValue);
+            foreach (var dataClassName in DataClassNames)
+            {
+                this.readers.Add(dataClassName, this.GetDataValue);
+            }
             this.readers.Add("GSPointValue", (obj) => this.GetPointValue(obj));
             this.readers.Add("GSSizeValue", (obj) => this.GetSizeValue(obj));
             this.readers.Add("GSRectValue", (obj) => this.GetRectValue(obj));

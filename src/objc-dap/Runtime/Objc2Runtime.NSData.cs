@@ -44,34 +44,68 @@ namespace Objc.Dap.Runtime
         /// </returns>
         public string? GetDataValue(Objc2Object @object)
         {
-            ArgumentNullException.ThrowIfNull(@object);
-
-            if (@object == Objc2Object.Null || @object.IsSmallObject)
+            if (!this.TryReadDataHeader(@object, out var length, out var bytes))
             {
                 return null;
             }
-
-            var className = this.GetClassName(@object);
-
-            if (className == null || !DataClassNames.Contains(className))
-            {
-                return null;
-            }
-
-            var length = this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + DataLengthOffset);
 
             if (length == 0)
             {
                 return "<0 bytes>";
             }
 
-            var bytes = this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + DataBytesOffset);
-
             Span<byte> preview = stackalloc byte[(int)Math.Min(length, DataPreviewLength)];
-            this.processMemoryReader.ReadExactly((nuint)bytes, preview);
+            this.processMemoryReader.ReadExactly(bytes, preview);
 
             var ellipsis = length > DataPreviewLength ? "…" : string.Empty;
             return $"<{length} bytes: {Convert.ToHexStringLower(preview)}{ellipsis}>";
+        }
+
+        /// <summary>
+        /// Gets the address and length of the buffer of an <c>NSData</c> object.
+        /// </summary>
+        /// <returns>
+        /// <see langword="false"/> if the object is not an <c>NSData</c>, or its buffer is empty.
+        /// </returns>
+        public bool TryGetDataBuffer(Objc2Object @object, out nuint address, out ulong length)
+        {
+            if (this.TryReadDataHeader(@object, out length, out address) && length > 0 && address != 0)
+            {
+                return true;
+            }
+
+            address = 0;
+            length = 0;
+            return false;
+        }
+
+        private bool TryReadDataHeader(Objc2Object @object, out ulong length, out nuint bytes)
+        {
+            ArgumentNullException.ThrowIfNull(@object);
+
+            length = 0;
+            bytes = 0;
+
+            if (@object == Objc2Object.Null || @object.IsSmallObject)
+            {
+                return false;
+            }
+
+            var className = this.GetClassName(@object);
+
+            if (className == null || !DataClassNames.Contains(className))
+            {
+                return false;
+            }
+
+            length = this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + DataLengthOffset);
+
+            if (length > 0)
+            {
+                bytes = (nuint)this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + DataBytesOffset);
+            }
+
+            return true;
         }
     }
 }

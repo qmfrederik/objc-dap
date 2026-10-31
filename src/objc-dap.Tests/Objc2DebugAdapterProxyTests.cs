@@ -341,6 +341,19 @@ namespace ObjcDap.Tests
                 Assert.Equal("^v", bytes.Type);
                 Assert.StartsWith("0x", bytes.Value);
 
+                // The binary viewer opens at the buffer, both from the data itself and from its bytes pointer.
+                Assert.Equal(bytes.Value, bytes.MemoryReference);
+                Assert.Equal(bytes.Value, data.MemoryReference);
+
+                var memory = client.Host.SendRequestSync(
+                    new ReadMemoryRequest()
+                    {
+                        MemoryReference = data.MemoryReference,
+                        Count = 4,
+                    });
+
+                Assert.Equal(Convert.ToBase64String([1, 2, 3, 4]), memory.Data);
+
                 client.Host.SendRequestSync(new DisconnectRequest());
 
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
