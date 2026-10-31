@@ -160,6 +160,10 @@ namespace Objc.Dap
             {
                 variable.Value = $"{className} <{itemCount} {(itemCount == 1 ? "item" : "items")}>";
             }
+            else if (value == null && className != null)
+            {
+                variable.Value = $"<{className}: 0x{@object.Address:X}>";
+            }
 
             if (indexedCount < 0 && namedCount < 0)
             {
