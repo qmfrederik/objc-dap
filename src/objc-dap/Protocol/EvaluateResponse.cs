@@ -8,6 +8,7 @@ namespace Objc.Dap.Protocol
 
         // Failed evaluations carry an error body of a different shape, and may have none at all.
         [JsonPropertyName("body")]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public EvaluateResponseBody? Body { get; set; }
     }
 }
