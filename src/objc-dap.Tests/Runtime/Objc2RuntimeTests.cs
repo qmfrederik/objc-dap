@@ -158,6 +158,7 @@ namespace ObjcDap.Tests.Runtime
                 { "point", "GSPointValue" },
                 { "size", "GSSizeValue" },
                 { "rect", "GSRectValue" },
+                { "range", "GSRangeValue" },
             };
 
             Dictionary<string, object?> values = new Dictionary<string, object?>()
@@ -167,6 +168,7 @@ namespace ObjcDap.Tests.Runtime
                 { "point", new PointF(1.5f, 2.5f) },
                 { "size", new SizeF(640f, 480f) },
                 { "rect", new RectangleF(10f, 20f, 300f, 200f) },
+                { "range", new System.Range(5, 15) },
             };
 
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadBaseTypes)))

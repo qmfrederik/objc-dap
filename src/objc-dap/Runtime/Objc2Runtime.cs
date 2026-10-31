@@ -36,6 +36,7 @@ namespace Objc.Dap.Runtime
             this.readers.Add("GSPointValue", (obj) => this.GetPointValue(obj));
             this.readers.Add("GSSizeValue", (obj) => this.GetSizeValue(obj));
             this.readers.Add("GSRectValue", (obj) => this.GetRectValue(obj));
+            this.readers.Add("GSRangeValue", (obj) => this.GetRangeValue(obj));
         }
 
         public void Open(int processId) => this.processMemoryReader.Open(processId);

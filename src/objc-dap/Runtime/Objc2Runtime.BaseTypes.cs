@@ -86,6 +86,37 @@ namespace Objc.Dap.Runtime
             return new SizeF((float)width, (float)height);
         }
 
+        /// <summary>
+        /// Gets the value of a boxed <c>NSRange</c> as a <see cref="Range"/> from the location to the location plus the length.
+        /// </summary>
+        /// <returns>
+        /// The range, or <see langword="null"/> if it does not fit in a <see cref="Range"/>, whose indices are 32-bit.
+        /// This includes ranges with a location of <c>NSNotFound</c>.
+        /// </returns>
+        public Range? GetRangeValue(Objc2Object @object)
+        {
+            ArgumentNullException.ThrowIfNull(@object);
+            this.AssertClass(@object, "GSRangeValue");
+
+            // See GSConcreteValueTemplate.m in gnustep-base, where GSRangeValue holds an NSRange.
+            // Offset   Field           Type
+            // 0        isa             Class
+            // 8        data.location   NSUInteger (8 bytes)
+            // 16       data.length     NSUInteger (8 bytes)
+
+            Span<byte> range = stackalloc byte[16];
+            this.processMemoryReader.ReadExactly(@object.Address + 8, range);
+            var location = BinaryPrimitives.ReadUInt64LittleEndian(range.Slice(0, 8));
+            var length = BinaryPrimitives.ReadUInt64LittleEndian(range.Slice(8, 8));
+
+            if (location > int.MaxValue || length > int.MaxValue - location)
+            {
+                return null;
+            }
+
+            return new Range((int)location, (int)(location + length));
+        }
+
         public RectangleF GetRectValue(Objc2Object @object)
         {
             ArgumentNullException.ThrowIfNull(@object);
