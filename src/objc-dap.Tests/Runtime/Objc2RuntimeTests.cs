@@ -356,6 +356,65 @@ namespace ObjcDap.Tests.Runtime
         }
 
         [Fact]
+        public void ObjcRuntime_CanReadData()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "emptyData", "NSDataStatic" },
+                { "staticData", "NSDataStatic" },
+                { "smallData", "NSDataMalloc" },
+                { "exactPreviewData", "NSDataMalloc" },
+                { "largeData", "NSDataMalloc" },
+                { "mutableData", "NSMutableDataMalloc" },
+                { "emptyMutableData", "NSMutableDataMalloc" },
+            };
+
+            Dictionary<string, object?> values = new Dictionary<string, object?>()
+            {
+                { "emptyData", "<0 bytes>" },
+                { "staticData", "<4 bytes: cafebabe>" },
+                { "smallData", "<3 bytes: 010203>" },
+                { "exactPreviewData", "<16 bytes: 000102030405060708090a0b0c0d0e0f>" },
+                { "largeData", "<100 bytes: 000102030405060708090a0b0c0d0e0f…>" },
+                { "mutableData", "<5 bytes: 0001020304>" },
+                { "emptyMutableData", "<0 bytes>" },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadData)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                Assert.Equal(values[name], runtime.GetObjectValue(objcValue));
+                values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
+        public void ObjcRuntime_NonData_HasNoDataValue()
+        {
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
+            {
+                var objcValue = runtime.ReadObject((nuint)address);
+                Assert.Null(runtime.GetDataValue(objcValue));
+            }
+        }
+
+        [Fact]
         public void ObjcRuntime_NonDictionary_HasNoNamedVariables()
         {
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
