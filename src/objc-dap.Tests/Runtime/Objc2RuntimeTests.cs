@@ -303,6 +303,59 @@ namespace ObjcDap.Tests.Runtime
         }
 
         [Fact]
+        public void ObjcRuntime_CanReadSet()
+        {
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "emptySet", "GSSet" },
+                { "stringSet", "GSSet" },
+                { "mutableSet", "GSMutableSet" },
+            };
+
+            Dictionary<string, List<object?>> values = new Dictionary<string, List<object?>>()
+            {
+                { "emptySet", new List<object?>() },
+                { "stringSet", new List<object?>() { "one", "two", "three" } },
+                { "mutableSet", Enumerable.Range(0, 20).Select(i => (object?)(i * 10)).ToList() },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadSet)))
+            {
+                string? className = null;
+
+                var objcValue = runtime.ReadObject((nuint)address);
+
+                if (objcValue != Objc2Object.Null && !objcValue.IsSmallObject)
+                {
+                    var objcClass = runtime.ReadClass(objcValue.Isa);
+                    className = runtime.GetClassName(objcClass);
+                }
+
+                Assert.Equal(classNames[name], className);
+                classNames.Remove(name);
+
+                // Set members have no defined order.
+                var expectedValue = values[name];
+                var count = runtime.GetIndexedVariablesCount(objcValue);
+                Assert.Equal(expectedValue.Count, count);
+
+                for (int i = 0; i < count; i++)
+                {
+                    var nestedObject = runtime.GetIndexedVariable(objcValue, i);
+                    Assert.True(expectedValue.Remove(runtime.GetObjectValue(nestedObject)));
+                }
+
+                Assert.Empty(expectedValue);
+                Assert.Equal(-1, runtime.GetNamedVariablesCount(objcValue));
+                values.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+            Assert.Empty(values);
+        }
+
+        [Fact]
         public void ObjcRuntime_NonDictionary_HasNoNamedVariables()
         {
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))

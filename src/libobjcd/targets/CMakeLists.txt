@@ -7,6 +7,10 @@ add_executable(SimpleTarget_CanReadVariables SimpleTarget_CanReadVariables.m)
 target_compile_options(SimpleTarget_CanReadVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(SimpleTarget_CanExpandSet SimpleTarget_CanExpandSet.m)
+target_compile_options(SimpleTarget_CanExpandSet PRIVATE -O0)
+target_link_libraries(SimpleTarget_CanExpandSet PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 add_executable(SimpleTarget_CanReadInstanceVariables SimpleTarget_CanReadInstanceVariables.m)
 target_compile_options(SimpleTarget_CanReadInstanceVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadInstanceVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
@@ -30,6 +34,10 @@ target_link_libraries(ObjcRuntime_CanReadArray PRIVATE gnustep-base::gnustep-bas
 add_executable(ObjcRuntime_CanReadDictionary ObjcRuntime_CanReadDictionary.m)
 target_compile_options(ObjcRuntime_CanReadDictionary PRIVATE -O0)
 target_link_libraries(ObjcRuntime_CanReadDictionary PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
+add_executable(ObjcRuntime_CanReadSet ObjcRuntime_CanReadSet.m)
+target_compile_options(ObjcRuntime_CanReadSet PRIVATE -O0)
+target_link_libraries(ObjcRuntime_CanReadSet PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
 add_executable(ObjcRuntime_CanReadInstanceVariables ObjcRuntime_CanReadInstanceVariables.m)
 target_compile_options(ObjcRuntime_CanReadInstanceVariables PRIVATE -O0)

@@ -19,6 +19,12 @@
 
             var className = this.GetClassName(@object);
 
+            // Sets are exposed as indexed variables too.
+            if (this.IsSet(className))
+            {
+                return this.GetSetCount(@object);
+            }
+
             if (!this.ArrayClassNames.Contains(className))
             {
                 return -1;
@@ -53,6 +59,11 @@
 
             ArgumentOutOfRangeException.ThrowIfNegative(index);
             ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(index, count, nameof(index));
+
+            if (this.IsSet(this.GetClassName(@object)))
+            {
+                return this.GetSetMember(@object, index);
+            }
 
             var contentsArray = this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + 8);
             var value = this.processMemoryReader.ReadUInt64LittleEndian((nuint)(contentsArray + (ulong)(index * 8)));
