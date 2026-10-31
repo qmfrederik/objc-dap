@@ -4,6 +4,7 @@ namespace Objc.Dap.Protocol
 {
     [JsonPolymorphic(TypeDiscriminatorPropertyName = "command", IgnoreUnrecognizedTypeDiscriminators = true)]
     [JsonDerivedType(typeof(VariablesResponse), VariablesResponse.CommandName)]
+    [JsonDerivedType(typeof(EvaluateResponse), EvaluateResponse.CommandName)]
     public class Response : ProtocolMessage
     {
         [JsonPropertyName("type")]
