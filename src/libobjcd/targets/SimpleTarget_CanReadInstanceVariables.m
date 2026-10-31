@@ -15,6 +15,6 @@ int main()
 {
     Person *person = [Person new];
     person->age = 42;
-    person->name = @"Alice";
+    person->name = @"Douglas Adams";
     return 0;
 }
