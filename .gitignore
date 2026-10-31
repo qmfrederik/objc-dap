@@ -1,6 +1,7 @@
 conan/
 build/
-.vscode/
+.vscode/*
+!.vscode/launch.json
 .vs/
 bin/
 obj/
