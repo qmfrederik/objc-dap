@@ -1,0 +1,1 @@
+{"body":{"error":{"format":"<user expression>:1:1: use of undeclared identifier 'nosuchvar'\n    1 | nosuchvar\n      | ^~~~~~~~~","id":22}},"command":"evaluate","request_seq":9,"seq":197,"success":false,"type":"response"}
