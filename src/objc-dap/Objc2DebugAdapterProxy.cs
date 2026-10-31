@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.Threading;
 using Objc.Dap.Protocol;
 using Objc.Dap.Runtime;
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -74,27 +75,9 @@ namespace Objc.Dap
 
                 foreach (var variable in variables)
                 {
-                    // lldb-dap reports Class variables as pointers to objc_class. They must not be read as instances.
-                    if (variable.Type is "Class" or "objc_class *"
-                        && variable.Value != null
-                        && variable.Value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    if (this.TryDescribe(variable.Type, variable.Value, out var description))
                     {
-                        this.DescribeClass(variable);
-                    }
-                    else if (variable.Type.EndsWith(" *")
-                        && variable.Value != null
-                        && variable.Value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-                    {
-                        // Try to read te
-                        var reference = GetValueAddress(variable);
-                        var @object = this.runtime.ReadObject((nuint)reference);
-
-                        if (@object == Objc2Object.Null)
-                        {
-                            continue;
-                        }
-
-                        this.Describe(variable, @object);
+                        description.ApplyTo(variable);
                     }
                 }
 
@@ -113,84 +96,83 @@ namespace Objc.Dap
 
         private void InvalidateReferences() => this.references.Clear();
 
-        private void DescribeClass(Variable variable)
+        // Describes a value reported by lldb-dap, given its type and its value, which is an address.
+        // Returns false if the value is not a pointer to something that can be read.
+        private bool TryDescribe(string? type, string? value, [NotNullWhen(true)] out Objc2ObjectDescription? description)
         {
-            var address = GetValueAddress(variable);
+            description = null;
 
-            if (address == 0)
+            if (type == null || value == null || !value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
             {
-                variable.Type = "Class";
-                variable.Value = "nil";
+                return false;
             }
-            else if (this.runtime.TryReadClass((nuint)address, out var @class))
+
+            var address = GetValueAddress(value);
+
+            // lldb-dap reports Class variables as pointers to objc_class. They must not be read as instances.
+            if (type is "Class" or "objc_class *")
             {
-                variable.Type = "Class";
-                variable.Value = this.runtime.GetClassName(@class) ?? "<unreadable>";
+                if (address == 0)
+                {
+                    description = new Objc2ObjectDescription() { Type = "Class", Value = "nil" };
+                }
+                else if (this.runtime.TryReadClass((nuint)address, out var @class))
+                {
+                    description = new Objc2ObjectDescription() { Type = "Class", Value = this.runtime.GetClassName(@class) ?? "<unreadable>" };
+                }
+
+                return description != null;
             }
+
+            if (!type.EndsWith(" *"))
+            {
+                return false;
+            }
+
+            var @object = this.runtime.ReadObject((nuint)address);
+
+            if (@object == Objc2Object.Null)
+            {
+                return false;
+            }
+
+            description = this.DescribeObject(@object);
+            return true;
         }
 
-        private void Describe(Variable variable, Objc2Object @object)
+        private void Describe(Variable variable, Objc2Object @object) => this.DescribeObject(@object).ApplyTo(variable);
+
+        private Objc2ObjectDescription DescribeObject(Objc2Object @object)
         {
-            var className = this.runtime.GetClassName(@object) ?? Objc2Runtime.GetSmallObjectClassName(@object.SmallObjectType);
+            var info = this.runtime.DescribeObject(@object);
+            var className = info.ClassName;
 
-            if (className != null)
-            {
-                variable.Type = $"{className} *";
-            }
-
-            var value = this.runtime.GetObjectValue(@object);
-
-            if (value != null)
-            {
-                variable.Value = value.ToString()!;
-            }
-
-            // Point the binary viewer at the buffer, not at the variable that holds the NSData pointer.
-            if (this.runtime.TryGetDataBuffer(@object, out var dataAddress, out _))
-            {
-                variable.MemoryReference = $"0x{dataAddress:X}";
-            }
-
-            var indexedCount = this.runtime.GetIndexedVariablesCount(@object);
-            var namedCount = this.runtime.GetNamedVariablesCount(@object);
+            string? text = info.Value?.ToString();
 
             // Collections have no value of their own, so summarize them with their class and size.
-            var itemCount = Math.Max(indexedCount, namedCount);
-            if (value == null && itemCount >= 0 && className != null)
+            if (info.Value == null && info.ItemCount >= 0 && className != null)
             {
-                variable.Value = $"{className} <{itemCount} {(itemCount == 1 ? "item" : "items")}>";
+                text = $"{className} <{info.ItemCount} {(info.ItemCount == 1 ? "item" : "items")}>";
             }
-            else if (value == null && className != null)
+            else if (info.Value == null && className != null)
             {
-                variable.Value = $"<{className}: 0x{@object.Address:X}>";
-            }
-
-            if (indexedCount < 0 && namedCount < 0)
-            {
-                namedCount = this.TryGetInstanceVariables(@object)?.Count ?? -1;
+                text = $"<{className}: 0x{@object.Address:X}>";
             }
 
             // An empty collection has nothing to expand.
-            if (itemCount != 0 && (indexedCount >= 0 || namedCount >= 0))
-            {
-                variable.VariablesReference = this.references.Add(@object.Address);
-                variable.IndexedVariables = Math.Max(indexedCount, 0);
-                variable.NamedVariables = Math.Max(namedCount, 0);
-            }
-        }
+            var expandable = info.ItemCount != 0 && (info.IndexedVariablesCount >= 0 || info.NamedVariablesCount >= 0);
 
-        // Null if the object has no instance variables or its class metadata can't be read.
-        private IReadOnlyList<Objc2InstanceVariable>? TryGetInstanceVariables(Objc2Object @object)
-        {
-            try
+            return new Objc2ObjectDescription()
             {
-                var instanceVariables = this.runtime.GetInstanceVariables(@object);
-                return instanceVariables.Count > 0 ? instanceVariables : null;
-            }
-            catch (InvalidOperationException)
-            {
-                return null;
-            }
+                Type = className != null ? $"{className} *" : null,
+                Value = text,
+
+                // Point the binary viewer at the buffer, not at the variable that holds the NSData pointer.
+                MemoryReference = info.DataBuffer != null ? $"0x{info.DataBuffer:X}" : null,
+                VariablesReference = expandable ? this.references.Add(@object.Address) : 0,
+                IndexedVariables = Math.Max(info.IndexedVariablesCount, 0),
+                NamedVariables = Math.Max(info.NamedVariablesCount, 0),
+            };
         }
 
         // Returns true if the request referred to a proxy-owned reference and was answered here.
@@ -226,7 +208,7 @@ namespace Objc.Dap
 
             if (indexedCount < 0 && namedCount < 0)
             {
-                instanceVariables = this.TryGetInstanceVariables(container);
+                instanceVariables = this.runtime.TryGetInstanceVariables(container);
                 namedCount = instanceVariables?.Count ?? -1;
             }
 
@@ -380,9 +362,9 @@ namespace Objc.Dap
             return variable;
         }
 
-        private static ulong GetValueAddress(Variable variable)
+        private static ulong GetValueAddress(string value)
         {
-            ReadOnlySpan<char> reference = variable.Value;
+            ReadOnlySpan<char> reference = value;
             if (reference.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
             {
                 reference = reference.Slice(2);
