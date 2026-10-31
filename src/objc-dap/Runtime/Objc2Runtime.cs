@@ -29,6 +29,10 @@ namespace Objc.Dap.Runtime
             this.readers.Add("GSCInlineString", this.GetGSCInlineStringValue);
             this.readers.Add("GSMutableString", this.GetGSCInlineStringValue);
             this.readers.Add("GSCBufferString", this.GetGSCInlineStringValue);
+            this.readers.Add("GSCSubString", this.GetGSCInlineStringValue);
+            this.readers.Add("GSUInlineString", this.GetGSCInlineStringValue);
+            this.readers.Add("GSUnicodeBufferString", this.GetGSCInlineStringValue);
+            this.readers.Add("GSUnicodeSubString", this.GetGSCInlineStringValue);
             this.readers.Add("NSURL", this.GetUriValue);
             foreach (var dataClassName in DataClassNames)
             {

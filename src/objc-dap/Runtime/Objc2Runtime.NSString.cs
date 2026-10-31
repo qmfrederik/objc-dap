@@ -6,6 +6,19 @@ namespace Objc.Dap.Runtime
 {
     public partial class Objc2Runtime
     {
+        // The concrete GSString classes share the initial layout of GSString (see GSPrivate.h and GSString.m),
+        // so they can all be read the same way.  The sub strings point into the buffer of their parent.
+        private static readonly string[] GSStringClassNames =
+        [
+            "GSCInlineString",
+            "GSCBufferString",
+            "GSCSubString",
+            "GSUInlineString",
+            "GSUnicodeBufferString",
+            "GSUnicodeSubString",
+            "GSMutableString",
+        ];
+
         public string? GetStringValue(Objc2Object @object)
         {
             ArgumentNullException.ThrowIfNull(@object);
@@ -17,12 +30,15 @@ namespace Objc.Dap.Runtime
 
             var @class = this.ReadClass(@object.Isa);
             var className = this.GetClassName(@class);
+
+            if (className != null && GSStringClassNames.Contains(className))
+            {
+                return this.GetGSCInlineStringValue(@object);
+            }
+
             return className switch
             {
                 "NSConstantString" => this.GetNSConstantStringValue(@object),
-                "GSCInlineString" => this.GetGSCInlineStringValue(@object),
-                "GSMutableString" => this.GetGSCInlineStringValue(@object),
-                "GSCBufferString" => this.GetGSCInlineStringValue(@object),
                 _ => null
             };
         }
@@ -121,11 +137,15 @@ namespace Objc.Dap.Runtime
             // Dereference the data pointer
             nuint contentsPtr = (nuint)this.processMemoryReader.ReadUInt64LittleEndian(@object.Address + 8);
 
-            using var owner = this.memoryPool.Rent((int)count);
-            var data = owner.Memory.Span.Slice(0, (int)count);
+            var wide = (flags & 1) != 0;
+
+            // The count is in characters, so 16-bit strings take two bytes per character.
+            var byteCount = wide ? checked((int)count * 2) : (int)count;
+            using var owner = this.memoryPool.Rent(byteCount);
+            var data = owner.Memory.Span.Slice(0, byteCount);
             this.processMemoryReader.ReadExactly(contentsPtr, data);
 
-            var encoding = (flags & 1) == 0 ? Encoding.UTF8 : Encoding.Unicode;
+            var encoding = wide ? Encoding.Unicode : Encoding.UTF8;
             var value = encoding.GetString(data);
             return value;
         }
