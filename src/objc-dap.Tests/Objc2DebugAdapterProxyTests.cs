@@ -246,5 +246,62 @@ namespace ObjcDap.Tests
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
             }
         }
+
+        [Fact]
+        public async Task SimpleTarget_CanExpandSet()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanExpandSet",
+                    file: "SimpleTarget_CanExpandSet.m",
+                    line: 6,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+                var set = variables.Single(s => s.Name == "set");
+
+                Assert.Equal("GSSet *", set.Type);
+                Assert.True(set.VariablesReference > 0);
+                Assert.Equal(3, set.IndexedVariables);
+                Assert.Null(set.NamedVariables);
+
+                var members = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = set.VariablesReference,
+                    }).Variables;
+
+                Assert.Equal(["[0]", "[1]", "[2]"], members.Select(m => m.Name));
+                Assert.All(members, m => Assert.Equal("NSString *", m.Type));
+
+                // Set members have no defined order.
+                Assert.Equivalent(new[] { "item1", "item2", "item3" }, members.Select(m => m.Value).ToArray());
+
+                var page = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = set.VariablesReference,
+                        Start = 1,
+                        Count = 1,
+                    }).Variables;
+
+                Assert.Equal("[1]", Assert.Single(page).Name);
+
+                var named = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = set.VariablesReference,
+                        Filter = VariablesArguments.FilterValue.Named,
+                    }).Variables;
+
+                Assert.Empty(named);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
     }
 }
