@@ -4,11 +4,20 @@
     {
         public static string GetTargetPath(string name)
         {
-            return
+            var path =
                 Path.GetFullPath(
                     Path.Combine(
                         GetSourceRoot(),
                         $"libobjcd/build/targets/{name}.exe"));
+
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException(
+                    $"Native test target '{name}' was not built. Make sure it is registered in src/libobjcd/targets/CMakeLists.txt.",
+                    path);
+            }
+
+            return path;
         }
 
         public static string GetSourcePath(string name)
