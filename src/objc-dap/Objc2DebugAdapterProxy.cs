@@ -125,11 +125,30 @@ namespace Objc.Dap
             var indexedCount = this.runtime.GetIndexedVariablesCount(@object);
             var namedCount = this.runtime.GetNamedVariablesCount(@object);
 
+            if (indexedCount < 0 && namedCount < 0)
+            {
+                namedCount = this.TryGetInstanceVariables(@object)?.Count ?? -1;
+            }
+
             if (indexedCount >= 0 || namedCount >= 0)
             {
                 variable.VariablesReference = this.references.Add(@object.Address);
                 variable.IndexedVariables = Math.Max(indexedCount, 0);
                 variable.NamedVariables = Math.Max(namedCount, 0);
+            }
+        }
+
+        // Null if the object has no instance variables or its class metadata can't be read.
+        private IReadOnlyList<Objc2InstanceVariable>? TryGetInstanceVariables(Objc2Object @object)
+        {
+            try
+            {
+                var instanceVariables = this.runtime.GetInstanceVariables(@object);
+                return instanceVariables.Count > 0 ? instanceVariables : null;
+            }
+            catch (InvalidOperationException)
+            {
+                return null;
             }
         }
 
@@ -162,6 +181,13 @@ namespace Objc.Dap
             var container = this.runtime.ReadObject(address);
             var indexedCount = this.runtime.GetIndexedVariablesCount(container);
             var namedCount = this.runtime.GetNamedVariablesCount(container);
+            IReadOnlyList<Objc2InstanceVariable>? instanceVariables = null;
+
+            if (indexedCount < 0 && namedCount < 0)
+            {
+                instanceVariables = this.TryGetInstanceVariables(container);
+                namedCount = instanceVariables?.Count ?? -1;
+            }
 
             if (indexedCount < 0 && namedCount < 0)
             {
@@ -186,7 +212,9 @@ namespace Objc.Dap
                 (int start, int end) = GetPage(arguments, namedCount);
                 for (int i = start; i < end; i++)
                 {
-                    variables.Add(this.ReadNamedVariable(container, i));
+                    variables.Add(instanceVariables != null
+                        ? this.ReadInstanceVariable(container, instanceVariables[i])
+                        : this.ReadNamedVariable(container, i));
                 }
             }
 
@@ -227,6 +255,64 @@ namespace Objc.Dap
             {
                 return this.CreateChildVariable($"[{index}]", Objc2Object.Null);
             }
+        }
+
+        private Variable ReadInstanceVariable(Objc2Object container, Objc2InstanceVariable instanceVariable)
+        {
+            var variable = new Variable()
+            {
+                Name = instanceVariable.Name,
+                Type = instanceVariable.TypeName,
+                Value = "<unreadable>",
+            };
+
+            object? value;
+            try
+            {
+                value = this.runtime.GetInstanceVariableValue(container, instanceVariable);
+            }
+            catch (InvalidOperationException)
+            {
+                return variable;
+            }
+
+            switch (value)
+            {
+                case null:
+                    variable.Value = "nil";
+                    break;
+
+                case Objc2Object child:
+                    if (child != Objc2Object.Null)
+                    {
+                        variable.Value = $"0x{child.Address:X}";
+                        this.Describe(variable, child);
+                    }
+
+                    break;
+
+                case Objc2Class @class:
+                    variable.Value = this.runtime.GetClassName(@class) ?? "<unreadable>";
+                    break;
+
+                case nuint pointer:
+                    variable.Value = $"0x{pointer:X}";
+                    break;
+
+                case byte[] bytes:
+                    variable.Value = BitConverter.ToString(bytes).Replace('-', ' ');
+                    break;
+
+                case bool flag:
+                    variable.Value = flag ? "true" : "false";
+                    break;
+
+                default:
+                    variable.Value = Convert.ToString(value, CultureInfo.InvariantCulture)!;
+                    break;
+            }
+
+            return variable;
         }
 
         private Variable CreateChildVariable(string name, Objc2Object child)
