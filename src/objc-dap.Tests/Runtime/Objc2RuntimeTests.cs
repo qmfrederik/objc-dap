@@ -456,6 +456,117 @@ namespace ObjcDap.Tests.Runtime
         }
 
         [Fact]
+        public void ObjcRuntime_CanDescribeCollections()
+        {
+            // Item count, and whether the children are indexed or named.
+            Dictionary<string, (string ClassName, int ItemCount, bool Indexed)> arrays = new()
+            {
+                { "emptyArray", ("GSInlineArray", 0, true) },
+                { "stringArray", ("GSInlineArray", 3, true) },
+                { "mutableArray", ("GSMutableArray", 4, true) },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines("ObjcRuntime_CanReadArray"))
+            {
+                var expected = arrays[name];
+                var info = runtime.DescribeObject(runtime.ReadObject((nuint)address));
+
+                Assert.Equal(expected.ClassName, info.ClassName);
+                Assert.Null(info.Value);
+                Assert.Null(info.DataBuffer);
+                Assert.Equal(expected.ItemCount, info.ItemCount);
+                Assert.Equal(expected.ItemCount, info.IndexedVariablesCount);
+                Assert.Equal(-1, info.NamedVariablesCount);
+                arrays.Remove(name);
+            }
+
+            Assert.Empty(arrays);
+
+            Dictionary<string, (string ClassName, int ItemCount)> dictionaries = new()
+            {
+                { "emptyDictionary", ("GSDictionary", 0) },
+                { "stringDictionary", ("GSDictionary", 3) },
+                { "mutableDictionary", ("GSMutableDictionary", 20) },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines("ObjcRuntime_CanReadDictionary"))
+            {
+                var expected = dictionaries[name];
+                var info = runtime.DescribeObject(runtime.ReadObject((nuint)address));
+
+                Assert.Equal(expected.ClassName, info.ClassName);
+                Assert.Null(info.Value);
+                Assert.Equal(expected.ItemCount, info.ItemCount);
+                Assert.Equal(-1, info.IndexedVariablesCount);
+                Assert.Equal(expected.ItemCount, info.NamedVariablesCount);
+                dictionaries.Remove(name);
+            }
+
+            Assert.Empty(dictionaries);
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanDescribeValuesAndInstanceVariables()
+        {
+            foreach ((var runtime, var name, var address) in this.ReadLines("ObjcRuntime_CanReadStrings"))
+            {
+                var info = runtime.DescribeObject(runtime.ReadObject((nuint)address));
+
+                // Strings have a value, but are not collections.
+                Assert.IsType<string>(info.Value);
+                Assert.Equal(-1, info.ItemCount);
+                Assert.Equal(-1, info.IndexedVariablesCount);
+
+                if (name == "tinyString")
+                {
+                    // Small objects have no class metadata, and no instance variables.
+                    Assert.Equal("NSString", info.ClassName);
+                    Assert.Equal(-1, info.NamedVariablesCount);
+                }
+                else if (name == "formattedString")
+                {
+                    Assert.Equal("GSCInlineString", info.ClassName);
+                    Assert.True(info.NamedVariablesCount > 0, "The instance variables are exposed as named children.");
+                }
+            }
+
+            foreach ((var runtime, var name, var address) in this.ReadLines("ObjcRuntime_CanReadClass"))
+            {
+                if (name != "object")
+                {
+                    continue;
+                }
+
+                // A plain object has no value, and exposes its instance variables.
+                var info = runtime.DescribeObject(runtime.ReadObject((nuint)address));
+                Assert.Equal("NSObject", info.ClassName);
+                Assert.Null(info.Value);
+                Assert.Equal(-1, info.ItemCount);
+                Assert.True(info.NamedVariablesCount > 0);
+            }
+        }
+
+        [Fact]
+        public void ObjcRuntime_CanDescribeDataBuffers()
+        {
+            foreach ((var runtime, var name, var address) in this.ReadLines("ObjcRuntime_CanReadData"))
+            {
+                var @object = runtime.ReadObject((nuint)address);
+                var info = runtime.DescribeObject(@object);
+
+                if (name is "emptyData" or "emptyMutableData")
+                {
+                    Assert.Null(info.DataBuffer);
+                }
+                else
+                {
+                    Assert.True(runtime.TryGetDataBuffer(@object, out var buffer, out _));
+                    Assert.Equal(buffer, info.DataBuffer);
+                }
+            }
+        }
+
+        [Fact]
         public void ObjcRuntime_NonDictionary_HasNoNamedVariables()
         {
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))
