@@ -87,6 +87,25 @@ namespace Objc.Dap.Runtime
             }
         }
 
+        /// <summary>
+        /// Reads the value of a variable of type <c>Class</c>, i.e. a pointer to an <c>objc_class</c>.
+        /// </summary>
+        /// <returns>
+        /// <see langword="false"/> if <paramref name="address"/> is null or does not point to a valid class.
+        /// </returns>
+        public bool TryReadClass(nuint address, out Objc2Class @class)
+        {
+            @class = Objc2Class.Null;
+
+            if (!this.ValidateClassHierarchy(address))
+            {
+                return false;
+            }
+
+            @class = this.ReadClass(address);
+            return @class != Objc2Class.Null;
+        }
+
         private static bool IsIdentifier(ReadOnlySpan<byte> bytes)
         {
             int length = bytes.IndexOf((byte)0);

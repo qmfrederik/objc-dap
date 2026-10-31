@@ -47,6 +47,10 @@ add_executable(ObjcRuntime_CanReadData ObjcRuntime_CanReadData.m)
 target_compile_options(ObjcRuntime_CanReadData PRIVATE -O0)
 target_link_libraries(ObjcRuntime_CanReadData PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(ObjcRuntime_CanReadClass ObjcRuntime_CanReadClass.m)
+target_compile_options(ObjcRuntime_CanReadClass PRIVATE -O0)
+target_link_libraries(ObjcRuntime_CanReadClass PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 add_executable(ObjcRuntime_CanReadInstanceVariables ObjcRuntime_CanReadInstanceVariables.m)
 target_compile_options(ObjcRuntime_CanReadInstanceVariables PRIVATE -O0)
 target_link_libraries(ObjcRuntime_CanReadInstanceVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
