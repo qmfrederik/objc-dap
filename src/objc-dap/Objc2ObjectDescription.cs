@@ -3,7 +3,7 @@ using Objc.Dap.Protocol;
 namespace Objc.Dap
 {
     /// <summary>
-    /// What is known about an object once it has been read from the debuggee, ready to be applied to a variable.
+        /// What is known about an object once it has been read from the debuggee, ready to be applied to a variable or an evaluate result.
     /// </summary>
     internal sealed class Objc2ObjectDescription
     {
@@ -31,6 +31,20 @@ namespace Objc.Dap
                 variable.VariablesReference = this.VariablesReference;
                 variable.IndexedVariables = this.IndexedVariables;
                 variable.NamedVariables = this.NamedVariables;
+            }
+        }
+
+        public void ApplyTo(EvaluateResponseBody body)
+        {
+            body.Type = this.Type ?? body.Type;
+            body.Result = this.Value ?? body.Result;
+            body.MemoryReference = this.MemoryReference ?? body.MemoryReference;
+
+            if (this.VariablesReference != 0)
+            {
+                body.VariablesReference = this.VariablesReference;
+                body.IndexedVariables = this.IndexedVariables;
+                body.NamedVariables = this.NamedVariables;
             }
         }
     }
