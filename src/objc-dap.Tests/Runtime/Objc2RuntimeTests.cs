@@ -415,6 +415,33 @@ namespace ObjcDap.Tests.Runtime
         }
 
         [Fact]
+        public void ObjcRuntime_CanReadClass()
+        {
+            // Null for pointers that are not a class.
+            Dictionary<string, string?> classNames = new Dictionary<string, string?>()
+            {
+                { "objectClass", "NSObject" },
+                { "stringClass", "NSString" },
+                { "arrayClass", "GSMutableArray" },
+                { "metaClass", "NSObject" },
+                { "nilClass", null },
+                { "object", null },
+                { "otherMemory", null },
+            };
+
+            foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadClass)))
+            {
+                var found = runtime.TryReadClass((nuint)address, out var @class);
+                Assert.Equal(classNames[name] != null, found);
+                Assert.Equal(classNames[name], found ? runtime.GetClassName(@class) : null);
+                classNames.Remove(name);
+            }
+
+            // All expected values have been processed.
+            Assert.Empty(classNames);
+        }
+
+        [Fact]
         public void ObjcRuntime_NonDictionary_HasNoNamedVariables()
         {
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadArray)))

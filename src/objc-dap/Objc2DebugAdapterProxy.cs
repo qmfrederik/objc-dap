@@ -74,7 +74,14 @@ namespace Objc.Dap
 
                 foreach (var variable in variables)
                 {
-                    if (variable.Type.EndsWith(" *")
+                    // lldb-dap reports Class variables as pointers to objc_class. They must not be read as instances.
+                    if (variable.Type is "Class" or "objc_class *"
+                        && variable.Value != null
+                        && variable.Value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    {
+                        this.DescribeClass(variable);
+                    }
+                    else if (variable.Type.EndsWith(" *")
                         && variable.Value != null
                         && variable.Value.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
                     {
@@ -105,6 +112,22 @@ namespace Objc.Dap
         }
 
         private void InvalidateReferences() => this.references.Clear();
+
+        private void DescribeClass(Variable variable)
+        {
+            var address = GetValueAddress(variable);
+
+            if (address == 0)
+            {
+                variable.Type = "Class";
+                variable.Value = "nil";
+            }
+            else if (this.runtime.TryReadClass((nuint)address, out var @class))
+            {
+                variable.Type = "Class";
+                variable.Value = this.runtime.GetClassName(@class) ?? "<unreadable>";
+            }
+        }
 
         private void Describe(Variable variable, Objc2Object @object)
         {
