@@ -54,17 +54,22 @@ namespace Objc.Dap
         {
             if (message is Request request)
             {
-                if (ReferenceInvalidatingCommands.Contains(request.Command))
+                switch (request)
                 {
-                    this.InvalidateReferences();
-                }
-                else if (request.Command == VariablesResponse.CommandName && this.TryHandleVariablesRequest(messageBytes))
-                {
-                    return;
-                }
-                else if (request.Command == EvaluateRequest.CommandName)
-                {
-                    this.TrackEvaluateRequest(messageBytes);
+                    case VariablesRequest variablesRequest when this.TryHandleVariablesRequest(variablesRequest):
+                        return;
+
+                    case EvaluateRequest evaluateRequest:
+                        this.TrackEvaluateRequest(evaluateRequest);
+                        break;
+
+                    default:
+                        if (ReferenceInvalidatingCommands.Contains(request.Command))
+                        {
+                            this.InvalidateReferences();
+                        }
+
+                        break;
                 }
 
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
@@ -200,13 +205,10 @@ namespace Objc.Dap
             };
         }
 
-        private void TrackEvaluateRequest(ReadOnlySequence<byte> messageBytes)
+        private void TrackEvaluateRequest(EvaluateRequest request)
         {
-            var reader = new Utf8JsonReader(messageBytes);
-            var request = JsonSerializer.Deserialize(ref reader, DebugAdapterSerializerContext.Default.EvaluateRequest);
-
             // Hover and watch show the result as a variable. The repl shows it as text, and clipboard needs it unchanged.
-            if (request?.Arguments?.Context is EvaluateArguments.HoverContext or EvaluateArguments.WatchContext)
+            if (request.Arguments?.Context is EvaluateArguments.HoverContext or EvaluateArguments.WatchContext)
             {
                 lock (this.evaluateRequestsLock)
                 {
@@ -224,12 +226,9 @@ namespace Objc.Dap
         }
 
         // Returns true if the request referred to a proxy-owned reference and was answered here.
-        private bool TryHandleVariablesRequest(ReadOnlySequence<byte> messageBytes)
+        private bool TryHandleVariablesRequest(VariablesRequest request)
         {
-            var reader = new Utf8JsonReader(messageBytes);
-            var request = JsonSerializer.Deserialize(ref reader, DebugAdapterSerializerContext.Default.VariablesRequest);
-
-            if (request?.Arguments == null || !this.references.TryGetAddress(request.Arguments.VariablesReference, out var address))
+            if (request.Arguments == null || !this.references.TryGetAddress(request.Arguments.VariablesReference, out var address))
             {
                 return false;
             }

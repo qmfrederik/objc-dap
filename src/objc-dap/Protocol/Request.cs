@@ -2,6 +2,7 @@
 
 namespace Objc.Dap.Protocol
 {
+    [JsonConverter(typeof(RequestConverter))]
     public class Request : ProtocolMessage
     {
         [JsonPropertyName("type")]
