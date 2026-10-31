@@ -51,6 +51,16 @@
             }
         },
         {
+            "name": "Empty Collections (objc-dap)",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/targets/SimpleTarget_CanReadEmptyCollections.exe",
+            "debugAdapterExecutable": "${workspaceFolder}/../objc-dap/bin/x64/Debug/net10.0/objc-dap.exe",
+            "env": {
+                // "OBJC_DAP_BREAK_ON_START": "1"
+            }
+        },
+        {
             "name": "Simple Target (objc-dap)",
             "type": "lldb-dap",
             "request": "launch",

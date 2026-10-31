@@ -35,13 +35,13 @@ namespace ObjcDap.Tests
                 var dict = variables.SingleOrDefault(s => s.Name == "dict");
                 Assert.NotNull(dict);
                 Assert.Equal("GSDictionary *", dict.Type);
-                Assert.StartsWith("0x", dict.Value);
+                Assert.Equal("GSDictionary <1 item>", dict.Value);
                 Assert.Null(dict.PresentationHint);
 
                 var array = variables.SingleOrDefault(s => s.Name == "array");
                 Assert.NotNull(array);
                 Assert.Equal("GSInlineArray *", array.Type);
-                Assert.StartsWith("0x", array.Value);
+                Assert.Equal("GSInlineArray <2 items>", array.Value);
                 Assert.Null(array.PresentationHint);
 
                 client.Host.SendRequestSync(new DisconnectRequest());
@@ -386,6 +386,37 @@ namespace ObjcDap.Tests
                 var nilClass = variables.Single(s => s.Name == "nilClass");
                 Assert.Equal("Class", nilClass.Type);
                 Assert.Equal("nil", nilClass.Value);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Fact]
+        public async Task SimpleTarget_CanReadEmptyCollections()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadEmptyCollections",
+                    file: "SimpleTarget_CanReadEmptyCollections.m",
+                    line: 8,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+
+                // Empty collections are summarized, but there is nothing to expand.
+                foreach ((var name, var className) in new[] { ("emptyArray", "GSInlineArray"), ("emptyDictionary", "GSDictionary"), ("emptyMutableArray", "GSMutableArray") })
+                {
+                    var variable = variables.Single(v => v.Name == name);
+                    Assert.Equal($"{className} *", variable.Type);
+                    Assert.Equal($"{className} <0 items>", variable.Value);
+                    Assert.Equal(0, variable.IndexedVariables ?? 0);
+                    Assert.Equal(0, variable.NamedVariables ?? 0);
+                    Assert.True(variable.VariablesReference < VariableReferenceStore.FirstReference, "The proxy must not hand out a reference for an empty collection.");
+                }
 
                 client.Host.SendRequestSync(new DisconnectRequest());
 
