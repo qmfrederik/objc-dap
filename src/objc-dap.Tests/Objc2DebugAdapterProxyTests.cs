@@ -111,6 +111,7 @@ namespace ObjcDap.Tests
                 var person = variables.Single(s => s.Name == "person");
 
                 Assert.Equal("Person *", person.Type);
+                Assert.StartsWith("<Person: 0x", person.Value);
                 Assert.True(person.VariablesReference > 0);
                 Assert.True(person.NamedVariables >= 2);
 
