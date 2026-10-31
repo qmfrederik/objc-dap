@@ -15,6 +15,10 @@ add_executable(SimpleTarget_CanReadData SimpleTarget_CanReadData.m)
 target_compile_options(SimpleTarget_CanReadData PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadData PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(SimpleTarget_CanReadClass SimpleTarget_CanReadClass.m)
+target_compile_options(SimpleTarget_CanReadClass PRIVATE -O0)
+target_link_libraries(SimpleTarget_CanReadClass PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 add_executable(SimpleTarget_CanReadInstanceVariables SimpleTarget_CanReadInstanceVariables.m)
 target_compile_options(SimpleTarget_CanReadInstanceVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadInstanceVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)

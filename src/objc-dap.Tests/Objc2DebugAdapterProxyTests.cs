@@ -359,5 +359,38 @@ namespace ObjcDap.Tests
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
             }
         }
+
+        [Fact]
+        public async Task SimpleTarget_CanReadClass()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadClass",
+                    file: "SimpleTarget_CanReadClass.m",
+                    line: 8,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+
+                var cls = variables.Single(s => s.Name == "cls");
+                Assert.Equal("Class", cls.Type);
+                Assert.Equal("NSString", cls.Value);
+
+                // Metaclasses carry the name of their class.
+                var metaClass = variables.Single(s => s.Name == "metaClass");
+                Assert.Equal("Class", metaClass.Type);
+                Assert.Equal("NSString", metaClass.Value);
+
+                var nilClass = variables.Single(s => s.Name == "nilClass");
+                Assert.Equal("Class", nilClass.Type);
+                Assert.Equal("nil", nilClass.Value);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
     }
 }
