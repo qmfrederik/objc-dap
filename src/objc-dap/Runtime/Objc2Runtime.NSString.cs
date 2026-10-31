@@ -22,6 +22,7 @@ namespace Objc.Dap.Runtime
                 "NSConstantString" => this.GetNSConstantStringValue(@object),
                 "GSCInlineString" => this.GetGSCInlineStringValue(@object),
                 "GSMutableString" => this.GetGSCInlineStringValue(@object),
+                "GSCBufferString" => this.GetGSCInlineStringValue(@object),
                 _ => null
             };
         }

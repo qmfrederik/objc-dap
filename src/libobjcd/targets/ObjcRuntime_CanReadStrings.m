@@ -12,6 +12,13 @@ int main()
     NSString *formattedString = [NSString stringWithFormat:@"Hello, %@", @"World!"];
     NSMutableString *mutableString = [NSMutableString stringWithString:@"You can change me"];
 
+    // ASCII bytes that are not copied end up in a GSCBufferString
+    static const char bufferBytes[] = "Backed by a buffer";
+    NSString *bufferString = [[NSString alloc] initWithBytesNoCopy:(void *)bufferBytes
+                                                            length:sizeof(bufferBytes) - 1
+                                                          encoding:NSASCIIStringEncoding
+                                                      freeWhenDone:NO];
+
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
@@ -21,6 +28,7 @@ int main()
     printf("constantStringUnicode: 0x%p\n", constantStringUnicode);
     printf("formattedString: 0x%p\n", formattedString);
     printf("mutableString: 0x%p\n", mutableString);
+    printf("bufferString: 0x%p\n", bufferString);
     printf("---\n");
 
     getchar();

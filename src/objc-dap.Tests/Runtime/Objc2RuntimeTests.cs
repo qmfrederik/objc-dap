@@ -53,6 +53,7 @@ namespace ObjcDap.Tests.Runtime
                 { "constantStringUnicode", "NSConstantString" },
                 { "formattedString", "GSCInlineString" },
                 { "mutableString", "GSMutableString" },
+                { "bufferString", "GSCBufferString" },
             };
 
             Dictionary<string, string?> values = new Dictionary<string, string?>()
@@ -63,6 +64,7 @@ namespace ObjcDap.Tests.Runtime
                 { "constantStringUnicode", "Fichier non trouvé" },
                 { "formattedString", "Hello, World!" },
                 { "mutableString", "You can change me" },
+                { "bufferString", "Backed by a buffer" },
             };
 
             foreach ((var runtime, var name, var address) in this.ReadLines(nameof(ObjcRuntime_CanReadStrings)))
