@@ -159,6 +159,18 @@ namespace ObjcDap.Tests
                 Assert.Equal("42", instanceVariables.Single(v => v.Name == "age").Value);
                 Assert.Equal("Douglas Adams", instanceVariables.Single(v => v.Name == "name").Value);
 
+                // lldb gets the offsets of instance variables wrong, so these are answered from the class metadata.
+                var age = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "person->age", FrameId = frameId, Context = EvaluateArguments.ContextValue.Hover });
+                Assert.Equal("int", age.Type);
+                Assert.Equal("42", age.Result);
+
+                var name = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "person->name", FrameId = frameId, Context = EvaluateArguments.ContextValue.Hover });
+                Assert.StartsWith("NS", name.Type);
+                Assert.Equal("Douglas Adams", name.Result);
+
+                // Anything we can't resolve is left to lldb, which reports its own error.
+                Assert.ThrowsAny<Exception>(() => client.Host.SendRequestSync(new EvaluateRequest() { Expression = "person->nosuchivar", FrameId = frameId, Context = EvaluateArguments.ContextValue.Hover }));
+
                 client.Host.SendRequestSync(new DisconnectRequest());
 
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
@@ -518,6 +530,68 @@ namespace ObjcDap.Tests
                 var array = client.Host.SendRequestSync(new EvaluateRequest() { Expression = "array", FrameId = frameId, Context = ToContext(context) });
                 Assert.Equal("NSArray *", array.Type);
                 Assert.DoesNotContain("items", array.Result);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
+        [Theory]
+        [InlineData("hover")]
+        [InlineData("watch")]
+        public async Task SimpleTarget_CanEvaluateNestedInstanceVariables(string context)
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadNestedInstanceVariables",
+                    file: "SimpleTarget_CanReadNestedInstanceVariables.m",
+                    line: 35,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var frameId = client.Host.SendRequestSync(new StackTraceRequest() { ThreadId = stoppedDetails.ThreadId!.Value }).StackFrames[0].Id;
+
+                EvaluateResponse Evaluate(string expression) =>
+                    client.Host.SendRequestSync(new EvaluateRequest() { Expression = expression, FrameId = frameId, Context = ToContext(context) });
+
+                var age = Evaluate("person->age");
+                Assert.Equal("int", age.Type);
+                Assert.Equal("42", age.Result);
+
+                // Each member leads to another object.
+                var friendAge = Evaluate("person->friend->age");
+                Assert.Equal("int", friendAge.Type);
+                Assert.Equal("43", friendAge.Result);
+
+                var friendName = Evaluate(" person -> friend -> name ");
+                Assert.StartsWith("NS", friendName.Type);
+                Assert.Equal("Ford Prefect", friendName.Result);
+
+                // An object in the middle of the chain can also be the result, and can be expanded.
+                var friend = Evaluate("person->friend");
+                Assert.Equal("Person *", friend.Type);
+                Assert.StartsWith("<Person: 0x", friend.Result);
+
+                var instanceVariables = client.Host.SendRequestSync(new VariablesRequest() { VariablesReference = friend.VariablesReference }).Variables;
+                Assert.Equal("43", instanceVariables.Single(v => v.Name == "age").Value);
+
+                // The chain ends at nil, which we know about and lldb does not: it reads garbage instead.
+                var nilChain = Assert.ThrowsAny<Exception>(() => Evaluate("person->friend->friend->name"));
+                Assert.Contains("person->friend->friend is nil", nilChain.Message);
+
+                // lldb is left to report an error for what we can't resolve.
+                Assert.ThrowsAny<Exception>(() => Evaluate("person->friend->nosuchivar"));
+
+                // A C struct is not an Objective-C object: lldb knows its layout, and answers.
+                var x = Evaluate("point->x");
+                Assert.Equal("int", x.Type);
+                Assert.Equal("5", x.Result);
+
+                // Not a chain of member accesses, so left to lldb as well.
+                var dereferenced = Evaluate("*point");
+                Assert.Equal("Point", dereferenced.Type);
 
                 client.Host.SendRequestSync(new DisconnectRequest());
 

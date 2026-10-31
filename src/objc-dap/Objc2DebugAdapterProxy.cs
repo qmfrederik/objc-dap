@@ -3,6 +3,7 @@ using Microsoft.VisualStudio.Threading;
 using Objc.Dap.Protocol;
 using Objc.Dap.Runtime;
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
@@ -40,6 +41,9 @@ namespace Objc.Dap
         private readonly HashSet<int> evaluateRequests = new HashSet<int>();
         private readonly Lock evaluateRequestsLock = new Lock();
 
+        // Member accesses which wait for lldb to evaluate the variable they start at, by the sequence number of that request.
+        private readonly ConcurrentDictionary<int, PendingMemberAccess> pendingMemberAccesses = new ConcurrentDictionary<int, PendingMemberAccess>();
+
         // lldb-dap sequence numbers are small; clients correlate responses by request_seq.
         private int sequence = VariableReferenceStore.FirstReference;
 
@@ -57,6 +61,9 @@ namespace Objc.Dap
                 switch (request)
                 {
                     case VariablesRequest variablesRequest when this.TryHandleVariablesRequest(variablesRequest):
+                        return;
+
+                    case EvaluateRequest evaluateRequest when this.TryEvaluateMemberAccess(evaluateRequest, messageWithHeader):
                         return;
 
                     case EvaluateRequest evaluateRequest:
@@ -83,6 +90,13 @@ namespace Objc.Dap
             }
             else if (message is EvaluateResponse evaluateResponse)
             {
+                // The answer to the question the proxy asked itself while evaluating a member access.
+                if (this.pendingMemberAccesses.TryRemove(evaluateResponse.RequestSequence, out var pending))
+                {
+                    this.CompleteMemberAccess(evaluateResponse, pending);
+                    return;
+                }
+
                 // Only the responses to hover and watch requests are tracked.
                 if (this.TryUntrackEvaluateRequest(evaluateResponse.RequestSequence)
                     && evaluateResponse.Success
@@ -224,6 +238,174 @@ namespace Objc.Dap
                 return this.evaluateRequests.Remove(sequence);
             }
         }
+
+        private sealed record PendingMemberAccess(EvaluateRequest Request, byte[] RequestBytes, MemberAccessChain Chain);
+
+        // Why this exists:
+        //
+        // lldb evaluates `object->ivar` with the wrong offset, so hovering over (or watching) such an expression
+        // shows garbage. For `Person *person` with `int age`, `person->age` returns the low half of the isa pointer
+        // instead of the age. libobjc2's non-fragile ABI does not store ivar offsets in the binary: each one lives in
+        // a variable which the runtime fills in when the class loads, and lldb does not know how to look these up.
+        // It treats every ivar as being at offset 0.
+        //
+        // The runtime does know the real offsets (see Objc2Runtime.GetInstanceVariables), and that is how the Variables
+        // pane gets them right. This does the same for expressions which are a chain of member accesses, i.e.
+        // `object->child->name`:
+        // - lldb is asked for the variable the chain starts at, which it can do (that is only a pointer),
+        // - the chain is then followed through the instance variables found in the class metadata,
+        // - if that does not work, e.g. for a C struct, the original request is sent on to lldb and its answer is used.
+        //
+        // Anything which is not exactly such a chain is left to lldb. See MemberAccessChain.
+        //
+        // This is a workaround, and covers only hover and watch. The debug console, conditional breakpoints and
+        // everything else that goes through lldb's expression evaluator still get the wrong values. The proper fix is
+        // upstream, so that lldb can find the ivar offsets of libobjc2 classes itself:
+        // - In LLDB: its Objective-C language runtime support should resolve ivar offsets for the GNUstep runtime, the
+        //   way it already does for Apple's runtime by asking the process. The information is available: a class
+        //   points to its ivar list, and every ivar to its offset (see Objc2Runtime.GetInstanceVariables), and the
+        //   public runtime API (class_getInstanceVariable, ivar_getOffset) returns the same. Note that we have not
+        //   checked what LLDB's GNUstep runtime plugin implements today. It may already have some of the plumbing.
+        // - In GNUstep (libobjc2, and clang for the debug information): if ivar offsets cannot be found through the
+        //   runtime in a way a debugger can rely on, a documented, stable interface for debuggers would be needed,
+        //   similar to what Apple's runtime exports for its debugger. That is for the libobjc2 maintainers to decide.
+        // Once LLDB does this, this code, MemberAccessChain and the tests for them can be removed.
+        //
+        // Returns true if the request was taken over by the proxy and must not be forwarded.
+        private bool TryEvaluateMemberAccess(EvaluateRequest request, ReadOnlySequence<byte> messageWithHeader)
+        {
+            if (request.Arguments?.Context is not (EvaluateArguments.HoverContext or EvaluateArguments.WatchContext)
+                || !MemberAccessChain.TryParse(request.Arguments.Expression, out var chain))
+            {
+                return false;
+            }
+
+            var probeSequence = Interlocked.Increment(ref this.sequence);
+            this.pendingMemberAccesses[probeSequence] = new PendingMemberAccess(request, messageWithHeader.ToArray(), chain);
+
+            var probe = new EvaluateRequest()
+            {
+                Sequence = probeSequence,
+                Command = EvaluateRequest.CommandName,
+                Arguments = new EvaluateArguments()
+                {
+                    Expression = chain.Root,
+                    FrameId = request.Arguments.FrameId,
+                    Context = request.Arguments.Context,
+                },
+            };
+
+            this.ServerQueue.Enqueue(this.CreateMessage(probe, DebugAdapterSerializerContext.Default.EvaluateRequest));
+            return true;
+        }
+
+        private void CompleteMemberAccess(EvaluateResponse probeResponse, PendingMemberAccess pending)
+        {
+            var answer = this.TryAnswerMemberAccess(probeResponse, pending);
+
+            if (answer != null)
+            {
+                this.ClientQueue.Enqueue(this.CreateMessage(answer, DebugAdapterSerializerContext.Default.Response));
+                return;
+            }
+
+            // Not something we know how to read, so let lldb answer the original request.
+            this.TrackEvaluateRequest(pending.Request);
+
+            var owner = this.memoryPool.Rent(pending.RequestBytes.Length);
+            var memory = owner.Memory.Slice(0, pending.RequestBytes.Length);
+            pending.RequestBytes.CopyTo(memory);
+            this.ServerQueue.Enqueue(new Message(owner, memory, pending.Request.Type, pending.Request));
+        }
+
+        // Returns null if the member access is not something which can be answered from the class metadata.
+        private EvaluateResponse? TryAnswerMemberAccess(EvaluateResponse probeResponse, PendingMemberAccess pending)
+        {
+            var chain = pending.Chain;
+            var body = probeResponse.Body;
+
+            if (!probeResponse.Success
+                || body?.Type == null
+                || !body.Type.EndsWith(" *")
+                || !body.Result.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            var container = this.runtime.ReadObject((nuint)GetValueAddress(body.Result));
+            var path = chain.Root;
+
+            for (var i = 0; i < chain.Members.Count; i++)
+            {
+                if (container == Objc2Object.Null)
+                {
+                    return null;
+                }
+
+                var instanceVariable = this.runtime.TryGetInstanceVariables(container)?.FirstOrDefault(v => v.Name == chain.Members[i]);
+
+                if (instanceVariable == null)
+                {
+                    return null;
+                }
+
+                path = $"{path}->{chain.Members[i]}";
+
+                if (i == chain.Members.Count - 1)
+                {
+                    return this.CreateEvaluateResponse(pending.Request, this.ReadInstanceVariable(container, instanceVariable));
+                }
+
+                // Every member but the last must lead to another Objective-C object.
+                object? next;
+
+                try
+                {
+                    next = this.runtime.GetInstanceVariableValue(container, instanceVariable);
+                }
+                catch (InvalidOperationException)
+                {
+                    return null;
+                }
+
+                if (next == null)
+                {
+                    // We understand the chain, and know there is nothing to follow, which is not what lldb would tell us.
+                    return new EvaluateResponse()
+                    {
+                        Sequence = Interlocked.Increment(ref this.sequence),
+                        RequestSequence = pending.Request.Sequence,
+                        Success = false,
+                        Message = $"Cannot read '{chain.Members[i + 1]}': {path} is nil.",
+                    };
+                }
+
+                if (next is not Objc2Object nextObject)
+                {
+                    return null;
+                }
+
+                container = nextObject;
+            }
+
+            return null;
+        }
+
+        private EvaluateResponse CreateEvaluateResponse(EvaluateRequest request, Variable variable) => new EvaluateResponse()
+        {
+            Sequence = Interlocked.Increment(ref this.sequence),
+            RequestSequence = request.Sequence,
+            Success = true,
+            Body = new EvaluateResponseBody()
+            {
+                Result = variable.Value,
+                Type = variable.Type,
+                VariablesReference = variable.VariablesReference,
+                IndexedVariables = variable.IndexedVariables,
+                NamedVariables = variable.NamedVariables,
+                MemoryReference = variable.MemoryReference,
+            },
+        };
 
         // Returns true if the request referred to a proxy-owned reference and was answered here.
         private bool TryHandleVariablesRequest(VariablesRequest request)
