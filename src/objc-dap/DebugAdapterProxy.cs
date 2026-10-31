@@ -34,6 +34,11 @@ namespace Objc.Dap
         protected AsyncQueue<Message?> ServerQueue => this.serverQueue;
 
         /// <summary>
+        /// Gets the logger.
+        /// </summary>
+        protected ILogger<DebugAdapterProxy> Logger => this.logger;
+
+        /// <summary>
         /// Initializes a new instance of the <see cref="DebugAdapterProxy"/> class.
         /// </summary>
         /// <param name="options">The options to configure the debug adapter proxy.</param>
@@ -150,26 +155,35 @@ namespace Objc.Dap
                         // Reset the reader
                         jsonReader = new Utf8JsonReader(message);
 
-                        switch (value.Type)
+                        try
                         {
-                            case ProtocolMessageType.Request:
-                                var request = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Request)!;
-                                this.ProxyRequest(messageWithHeader, message, request, target);
-                                break;
+                            switch (value.Type)
+                            {
+                                case ProtocolMessageType.Request:
+                                    var request = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Request)!;
+                                    this.ProxyRequest(messageWithHeader, message, request, target);
+                                    break;
 
-                            case ProtocolMessageType.Response:
-                                var response = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Response)!;
-                                this.ProxyResponse(messageWithHeader, message, response, target);
-                                break;
+                                case ProtocolMessageType.Response:
+                                    var response = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Response)!;
+                                    this.ProxyResponse(messageWithHeader, message, response, target);
+                                    break;
 
-                            case ProtocolMessageType.Event:
-                                var @event = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Event)!;
-                                this.ProxyEvent(messageWithHeader, message, @event, target);
-                                break;
+                                case ProtocolMessageType.Event:
+                                    var @event = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.Event)!;
+                                    this.ProxyEvent(messageWithHeader, message, @event, target);
+                                    break;
 
-                            default:
-                                this.ProxyMessage(messageWithHeader, message, value, target);
-                                break;
+                                default:
+                                    this.ProxyMessage(messageWithHeader, message, value, target);
+                                    break;
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            // A message we don't understand must not end the session. Pass it on as it is.
+                            this.logger.LogError(ex, "Could not process a {Type} message. It is forwarded unchanged.", value.Type);
+                            this.ForwardUnchanged(messageWithHeader, value, target);
                         }
 
                         reader.AdvanceTo(message.End);
@@ -196,7 +210,13 @@ namespace Objc.Dap
             this.ProxyMessage(messageWithHeader, messageBytes, @event, target);
         }
 
-        protected virtual void ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target)
+        protected virtual void ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target) =>
+            this.ForwardUnchanged(messageWithHeader, message, target);
+
+        /// <summary>
+        /// Passes a message on exactly as it was received.
+        /// </summary>
+        protected void ForwardUnchanged(ReadOnlySequence<byte> messageWithHeader, ProtocolMessage message, AsyncQueue<Message?> target)
         {
             var owner = this.memoryPool.Rent((int)messageWithHeader.Length);
             var messageMemory = owner.Memory.Slice(0, (int)messageWithHeader.Length);

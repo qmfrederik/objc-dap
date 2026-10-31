@@ -511,6 +511,43 @@ namespace ObjcDap.Tests
             }
         }
 
+        [Fact]
+        public async Task SimpleTarget_SurvivesCorruptObjects()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadCorruptObjects",
+                    file: "SimpleTarget_CanReadCorruptObjects.m",
+                    line: 13,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+
+                // The string can't be read, so it keeps what lldb reported, and does not take the session down.
+                var corruptString = variables.Single(v => v.Name == "corruptString");
+                Assert.StartsWith("0x", corruptString.Value);
+
+                var healthy = variables.Single(v => v.Name == "healthy");
+                Assert.StartsWith("<NSObject: 0x", healthy.Value);
+
+                // The session still works, and the elements which can't be read are reported as such.
+                var corruptArray = variables.Single(v => v.Name == "corruptArray");
+                Assert.True(corruptArray.VariablesReference >= VariableReferenceStore.FirstReference);
+
+                var elements = client.Host.SendRequestSync(new VariablesRequest() { VariablesReference = corruptArray.VariablesReference }).Variables;
+                Assert.Equal("<unreadable>", Assert.Single(elements).Value);
+
+                var again = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+                Assert.Equal(variables.Count, again.Count);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
         [Theory]
         [InlineData("repl")]
         [InlineData("clipboard")]

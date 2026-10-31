@@ -5,6 +5,7 @@ using Objc.Dap;
 using Objc.Dap.Protocol;
 using Objc.Dap.Runtime;
 using System.Buffers;
+using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 
@@ -135,6 +136,60 @@ namespace ObjcDap.Tests
         }
 
         [Fact]
+        public void ProcessEvent_WithoutProcessId_IsForwarded()
+        {
+            var harness = new Harness();
+
+            harness.Send("""{"seq":1,"type":"event","event":"process","body":{"name":"target"}}""");
+
+            Assert.Single(harness.Forwarded);
+            harness.Reader.Verify(r => r.Open(It.IsAny<int>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(typeof(InvalidOperationException))]
+        [InlineData(typeof(Win32Exception))]
+        [InlineData(typeof(NotSupportedException))]
+        public void ProcessEvent_ProcessCanNotBeOpened_IsForwarded(Type exceptionType)
+        {
+            var harness = new Harness();
+            harness.Reader.Setup(r => r.Open(It.IsAny<int>())).Throws((Exception)Activator.CreateInstance(exceptionType)!);
+
+            harness.Send("""{"seq":1,"type":"event","event":"process","body":{"name":"target","systemProcessId":1234}}""");
+
+            Assert.Single(harness.Forwarded);
+        }
+
+        [Fact]
+        public void VariablesResponse_UnreadableObject_KeepsTheReportedValue()
+        {
+            var harness = new Harness(new UnreadableMemoryReader());
+
+            harness.Send(CreateVariablesResponse("NSString *", "0x0000000000001000"));
+
+            var response = Assert.IsType<VariablesResponse>(Assert.Single(harness.Forwarded).Payload);
+            var variable = Assert.Single(response.Body.Variables);
+            Assert.Equal("NSString *", variable.Type);
+            Assert.Equal("0x0000000000001000", variable.Value);
+        }
+
+        [Fact]
+        public void Message_ThatCanNotBeProcessed_IsForwardedUnchanged()
+        {
+            var harness = new Harness();
+
+            // The process event has to open the process, and does not expect this exception.
+            harness.Reader.Setup(r => r.Open(It.IsAny<int>())).Throws(new NotSupportedException());
+            var json = """{"seq":1,"type":"event","event":"process","body":{"name":"target","systemProcessId":1234}}""";
+
+            harness.Send(json);
+
+            var message = Assert.Single(harness.Forwarded);
+            var expected = Encoding.UTF8.GetBytes($"Content-Length: {Encoding.UTF8.GetByteCount(json)}\r\n\r\n{json}");
+            Assert.Equal(expected, message.Value.ToArray());
+        }
+
+        [Fact]
         public void Request_DeserializesCommand()
         {
             var request = JsonSerializer.Deserialize(
@@ -151,12 +206,38 @@ namespace ObjcDap.Tests
         private static string CreateVariablesRequest(int seq, int reference) =>
             "{\"seq\":" + seq + ",\"type\":\"request\",\"command\":\"variables\",\"arguments\":{\"variablesReference\":" + reference + "}}";
 
+        private static string CreateVariablesResponse(string type, string value) =>
+            "{\"seq\":9,\"type\":\"response\",\"request_seq\":7,\"success\":true,\"command\":\"variables\",\"body\":{\"variables\":[" +
+            "{\"name\":\"s\",\"type\":\"" + type + "\",\"value\":\"" + value + "\",\"variablesReference\":3}]}}";
+
+        // A process of which no memory can be read, as if every pointer was invalid.
+        private sealed class UnreadableMemoryReader : ProcessMemoryReader
+        {
+            public override void Open(int processId)
+            {
+            }
+
+            public override int Read(nuint baseAddress, Span<byte> buffer) => throw new Win32Exception(299);
+
+            public override bool IsDereferencableMemory(nuint baseAddress) => true;
+
+            public override void Dispose()
+            {
+            }
+        }
+
         private sealed class Harness
         {
             private readonly TestProxy proxy;
             private readonly AsyncQueue<Message?> target = new AsyncQueue<Message?>();
 
             public Harness()
+                : this(null)
+            {
+            }
+
+            // Uses a reader other than the mocked one, e.g. one which can't read the debuggee.
+            public Harness(ProcessMemoryReader? reader)
             {
                 this.Reader = new Mock<ProcessMemoryReader>();
                 this.References = new VariableReferenceStore();
@@ -171,7 +252,7 @@ namespace ObjcDap.Tests
 
                 this.proxy = new TestProxy(
                     options,
-                    new Objc2Runtime(this.Reader.Object, NullLogger<Objc2Runtime>.Instance),
+                    new Objc2Runtime(reader ?? this.Reader.Object, NullLogger<Objc2Runtime>.Instance),
                     this.References);
             }
 
@@ -204,6 +285,7 @@ namespace ObjcDap.Tests
                 {
                     ProtocolMessageType.Request => JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.Request)!,
                     ProtocolMessageType.Event => JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.Event)!,
+                    ProtocolMessageType.Response => JsonSerializer.Deserialize(json, DebugAdapterSerializerContext.Default.Response)!,
                     _ => protocolMessage,
                 };
 

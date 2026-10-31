@@ -116,7 +116,18 @@ namespace Objc.Dap.Runtime
             }
 
             Span<byte> buffer = stackalloc byte[8]; // Assuming 64-bit pointers
-            int read = this.processMemoryReader.Read(address, buffer);
+            int read;
+
+            try
+            {
+                read = this.processMemoryReader.Read(address, buffer);
+            }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                this.logger.LogWarning(ex, $"Failed to read memory at address 0x{address:X}.");
+                return Objc2Object.Null;
+            }
+
             if (read != buffer.Length)
             {
                 this.logger.LogWarning($"Failed to read memory at address 0x{address:X}. Read {read} bytes.");

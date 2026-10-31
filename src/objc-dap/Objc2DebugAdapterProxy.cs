@@ -4,6 +4,7 @@ using Objc.Dap.Protocol;
 using Objc.Dap.Runtime;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
@@ -56,6 +57,21 @@ namespace Objc.Dap
 
         protected override void ProxyMessage(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target)
         {
+            // Whatever the proxy adds is a bonus. A bug, or something unexpected in the debuggee, must never end the
+            // debug session, so the message is passed on as it was received instead.
+            try
+            {
+                this.ProxyMessageCore(messageWithHeader, messageBytes, message, target);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                this.Logger.LogError(ex, "Could not process a {Type} message. It is forwarded unchanged.", message.Type);
+                this.ForwardUnchanged(messageWithHeader, message, target);
+            }
+        }
+
+        private void ProxyMessageCore(ReadOnlySequence<byte> messageWithHeader, ReadOnlySequence<byte> messageBytes, ProtocolMessage message, AsyncQueue<Message?> target)
+        {
             if (message is Request request)
             {
                 switch (request)
@@ -85,7 +101,7 @@ namespace Objc.Dap
             {
                 var processEvent = (ProcessEvent)message;
                 this.InvalidateReferences();
-                this.runtime.Open(processEvent.Body.SystemProcessId!.Value);
+                this.OpenProcess(processEvent.Body?.SystemProcessId);
                 base.ProxyMessage(messageWithHeader, messageBytes, message, target);
             }
             else if (message is EvaluateResponse evaluateResponse)
@@ -140,6 +156,26 @@ namespace Objc.Dap
 
         private void InvalidateReferences() => this.references.Clear();
 
+        // The process id is optional in the protocol, and opening the process can fail, e.g. for a process on another
+        // machine or one we have no access to. Without access to the process, we have nothing to add.
+        private void OpenProcess(int? processId)
+        {
+            if (processId == null)
+            {
+                this.Logger.LogWarning("The process event has no process id, so process memory can't be read.");
+                return;
+            }
+
+            try
+            {
+                this.runtime.Open(processId.Value);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or ArgumentException)
+            {
+                this.Logger.LogWarning(ex, "Could not open process {ProcessId}, so process memory can't be read.", processId);
+            }
+        }
+
         // Describes a value reported by lldb-dap, given its type and its value, which is an address.
         // Returns false if the value is not a pointer to something that can be read.
         private bool TryDescribe(string? type, string? value, [NotNullWhen(true)] out Objc2ObjectDescription? description)
@@ -180,11 +216,31 @@ namespace Objc.Dap
                 return false;
             }
 
-            description = this.DescribeObject(@object);
+            // Objects can be in any state while debugging. If this one can't be read, show what lldb-dap reported.
+            try
+            {
+                description = this.DescribeObject(@object);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                this.Logger.LogWarning(ex, "Could not read the object at 0x{Address:X}.", @object.Address);
+                return false;
+            }
+
             return true;
         }
 
-        private void Describe(Variable variable, Objc2Object @object) => this.DescribeObject(@object).ApplyTo(variable);
+        private void Describe(Variable variable, Objc2Object @object)
+        {
+            try
+            {
+                this.DescribeObject(@object).ApplyTo(variable);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                this.Logger.LogWarning(ex, "Could not read the object at 0x{Address:X}.", @object.Address);
+            }
+        }
 
         private Objc2ObjectDescription DescribeObject(Objc2Object @object)
         {
@@ -301,7 +357,18 @@ namespace Objc.Dap
 
         private void CompleteMemberAccess(EvaluateResponse probeResponse, PendingMemberAccess pending)
         {
-            var answer = this.TryAnswerMemberAccess(probeResponse, pending);
+            // Following the chain reads memory of an object we know little about. If that goes wrong, let lldb answer.
+            EvaluateResponse? answer;
+
+            try
+            {
+                answer = this.TryAnswerMemberAccess(probeResponse, pending);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+            {
+                this.Logger.LogWarning(ex, "Could not read '{Expression}'. lldb is asked instead.", pending.Request.Arguments?.Expression);
+                answer = null;
+            }
 
             if (answer != null)
             {

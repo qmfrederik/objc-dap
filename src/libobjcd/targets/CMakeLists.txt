@@ -27,6 +27,10 @@ add_executable(SimpleTarget_CanReadNestedInstanceVariables SimpleTarget_CanReadN
 target_compile_options(SimpleTarget_CanReadNestedInstanceVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadNestedInstanceVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
 
+add_executable(SimpleTarget_CanReadCorruptObjects SimpleTarget_CanReadCorruptObjects.m)
+target_compile_options(SimpleTarget_CanReadCorruptObjects PRIVATE -O0)
+target_link_libraries(SimpleTarget_CanReadCorruptObjects PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)
+
 add_executable(SimpleTarget_CanReadInstanceVariables SimpleTarget_CanReadInstanceVariables.m)
 target_compile_options(SimpleTarget_CanReadInstanceVariables PRIVATE -O0)
 target_link_libraries(SimpleTarget_CanReadInstanceVariables PRIVATE gnustep-base::gnustep-base libobjc2::libobjc2)

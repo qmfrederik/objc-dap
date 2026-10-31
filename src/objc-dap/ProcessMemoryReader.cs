@@ -1,5 +1,6 @@
 ﻿using Microsoft;
 using System.Buffers.Binary;
+using System.ComponentModel;
 
 namespace Objc.Dap
 {
@@ -24,7 +25,18 @@ namespace Objc.Dap
 
         public void ReadExactly(nuint baseAddress, Span<byte> buffer)
         {
-            int bytesRead = this.Read(baseAddress, buffer);
+            int bytesRead;
+
+            try
+            {
+                bytesRead = this.Read(baseAddress, buffer);
+            }
+            catch (Win32Exception ex)
+            {
+                // Memory which can't be read is part of debugging, e.g. a pointer in an object that isn't initialized yet.
+                throw new InvalidOperationException($"Could not read process memory at 0x{baseAddress:X}.", ex);
+            }
+
             if (bytesRead != buffer.Length)
             {
                 throw new InvalidOperationException($"Could not read the expected number of bytes from process memory. Expected {buffer.Length}, but read {bytesRead}.");

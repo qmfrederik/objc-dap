@@ -21,6 +21,35 @@ namespace ObjcDap.Tests
         }
 
         [WindowsFact]
+        public unsafe void Open_CanReplaceTheProcess()
+        {
+            // A restarted debuggee, or another one, is reported with a new process event.
+            using var reader = new Win32ProcessMemoryReader();
+            reader.Open(Environment.ProcessId);
+            reader.Open(Environment.ProcessId);
+
+            Span<byte> source = stackalloc byte[4] { 1, 2, 3, 4 };
+            Span<byte> target = stackalloc byte[4];
+
+            fixed (byte* sourcePtr = source)
+            {
+                Assert.Equal(4, reader.Read((nuint)sourcePtr, target));
+                Assert.Equal(source, target);
+            }
+        }
+
+        [WindowsFact]
+        public void ReadExactly_UnreadableMemory_ThrowsInvalidOperationException()
+        {
+            using var reader = new Win32ProcessMemoryReader();
+            reader.Open(Environment.ProcessId);
+
+            Memory<byte> buffer = new byte[4];
+            var exception = Assert.Throws<InvalidOperationException>(() => reader.ReadExactly(1, buffer.Span));
+            Assert.IsType<Win32Exception>(exception.InnerException);
+        }
+
+        [WindowsFact]
         public void NotOpen_ValidatesArguments()
         {
             using var reader = new Win32ProcessMemoryReader();

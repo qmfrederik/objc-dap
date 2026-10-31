@@ -21,20 +21,21 @@ namespace Objc.Dap
             Verify.NotDisposed(this);
             ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(processId, 0, nameof(processId));
 
-            if (this.handle != null)
-            {
-                throw new InvalidOperationException("Process is already open.");
-            }
+            // A process which is restarted, or a new one, replaces the previous one.
+            this.handle?.Dispose();
+            this.handle = null;
 
-            this.handle = OpenProcess_SafeHandle(
+            var newHandle = OpenProcess_SafeHandle(
                 PROCESS_ACCESS_RIGHTS.PROCESS_VM_READ | PROCESS_ACCESS_RIGHTS.PROCESS_QUERY_INFORMATION,
                 bInheritHandle: false,
                 (uint)processId);
 
-            if (this.handle.IsInvalid)
+            if (newHandle.IsInvalid)
             {
-                throw new Exception($"Failed to open process memory for process {processId}");
+                throw new Win32Exception(Marshal.GetLastWin32Error(), $"Failed to open process memory for process {processId}");
             }
+
+            this.handle = newHandle;
         }
 
         public override unsafe int Read(nuint baseAddress, Span<byte> buffer)
