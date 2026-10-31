@@ -122,6 +122,12 @@ namespace Objc.Dap
                 variable.Value = value.ToString()!;
             }
 
+            // Point the binary viewer at the buffer, not at the variable that holds the NSData pointer.
+            if (this.runtime.TryGetDataBuffer(@object, out var dataAddress, out _))
+            {
+                variable.MemoryReference = $"0x{dataAddress:X}";
+            }
+
             var indexedCount = this.runtime.GetIndexedVariablesCount(@object);
             var namedCount = this.runtime.GetNamedVariablesCount(@object);
 
@@ -297,6 +303,12 @@ namespace Objc.Dap
 
                 case nuint pointer:
                     variable.Value = $"0x{pointer:X}";
+
+                    if (pointer != 0)
+                    {
+                        variable.MemoryReference = variable.Value;
+                    }
+
                     break;
 
                 case byte[] bytes:

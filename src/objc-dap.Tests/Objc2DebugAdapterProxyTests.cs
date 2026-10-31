@@ -303,5 +303,61 @@ namespace ObjcDap.Tests
                 await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
             }
         }
+
+        [Fact]
+        public async Task SimpleTarget_CanReadData()
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadData",
+                    file: "SimpleTarget_CanReadData.m",
+                    line: 6,
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+                var data = variables.Single(s => s.Name == "data");
+
+                Assert.Equal("NSDataMalloc *", data.Type);
+                Assert.Equal("<4 bytes: 01020304>", data.Value);
+
+                // The data has no children of its own, so it falls back to its instance variables.
+                Assert.True(data.VariablesReference > 0);
+                Assert.Null(data.IndexedVariables);
+
+                var instanceVariables = client.Host.SendRequestSync(
+                    new VariablesRequest()
+                    {
+                        VariablesReference = data.VariablesReference,
+                    }).Variables;
+
+                Assert.Equal(data.NamedVariables, instanceVariables.Count);
+
+                var length = instanceVariables.Single(v => v.Name == "length");
+                Assert.Equal("4", length.Value);
+
+                var bytes = instanceVariables.Single(v => v.Name == "bytes");
+                Assert.Equal("^v", bytes.Type);
+                Assert.StartsWith("0x", bytes.Value);
+
+                // The binary viewer opens at the buffer, both from the data itself and from its bytes pointer.
+                Assert.Equal(bytes.Value, bytes.MemoryReference);
+                Assert.Equal(bytes.Value, data.MemoryReference);
+
+                var memory = client.Host.SendRequestSync(
+                    new ReadMemoryRequest()
+                    {
+                        MemoryReference = data.MemoryReference,
+                        Count = 4,
+                    });
+
+                Assert.Equal(Convert.ToBase64String([1, 2, 3, 4]), memory.Data);
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
     }
 }
