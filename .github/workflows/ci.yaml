@@ -4,8 +4,6 @@ on:
   push: 
     branches:
       - main
-    tags:
-      - 'v*'
   pull_request:
 
 jobs:
@@ -85,9 +83,3 @@ jobs:
         with:
           name: objc-dap
           path: src/objc-dap/bin/Release/net10.0/win-x64/publish/objc-dap.exe
-      - name: Release
-        uses: softprops/action-gh-release@v3
-        if: github.ref_type == 'tag'
-        with:
-          files: objc-dap.exe
-          working_directory: src/objc-dap/bin/Release/net10.0/win-x64/publish/
