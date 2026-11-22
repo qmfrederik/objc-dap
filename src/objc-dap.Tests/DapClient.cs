@@ -101,7 +101,10 @@ namespace ObjcDap.Tests
             return eventReceived.Task;
         }
 
-        public async Task<StoppedEvent> LaunchProgramAndRunToBreakpointAsync(string program, string file, int line, CancellationToken cancellationToken)
+        public Task<StoppedEvent> LaunchProgramAndRunToBreakpointAsync(string program, string file, int line, CancellationToken cancellationToken)
+            => this.LaunchProgramAndRunToBreakpointAsync(program, file, line, null, cancellationToken);
+
+        public async Task<StoppedEvent> LaunchProgramAndRunToBreakpointAsync(string program, string file, int line, IReadOnlyList<string>? programArgs, CancellationToken cancellationToken)
         {
             var initializeResponse = this.Host.SendRequestSync(
                 new InitializeRequest()
@@ -119,6 +122,7 @@ namespace ObjcDap.Tests
                 {
                     Args = {
                         Program = TestAssets.GetTargetPath(program),
+                        ProgramArgs = programArgs,
                         StopOnEntry = false,
                     }
                 },
