@@ -13,6 +13,12 @@ namespace ObjcDap.Tests
         public string? Program { get; set; }
 
         /// <summary>
+        /// Gets or sets the command line arguments of the program.
+        /// </summary>
+        [JsonProperty("args", NullValueHandling = NullValueHandling.Ignore)]
+        public IReadOnlyList<string>? ProgramArgs { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether to stop program immediately after launching.
         /// </summary>
         [JsonProperty("stopOnEntry")]

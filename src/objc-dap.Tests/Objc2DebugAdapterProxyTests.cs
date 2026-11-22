@@ -466,6 +466,44 @@ namespace ObjcDap.Tests
             }
         }
 
+        [Theory]
+        [InlineData("self")] // Readable memory, which does not hold an object.
+        [InlineData("DEADBEEFDEADBEEF")] // Not a canonical address.
+        [InlineData("1000")] // Aligned, but unmapped.
+        [InlineData("AAAAAAAAAAAAAAAA")] // Looks like a small object.
+        [InlineData("FFFFFFFFFFFFFFFF")]
+        public async Task SimpleTarget_CanReadUninitializedVariables(string poison)
+        {
+            using (var client = new DapClient<Objc2DebugAdapterProxy>(outputHelper))
+            {
+                var task = client.RunAsync(TestContext.Current.CancellationToken);
+                var stoppedDetails = await client.LaunchProgramAndRunToBreakpointAsync(
+                    program: "SimpleTarget_CanReadUninitializedVariables",
+                    file: "SimpleTarget_CanReadUninitializedVariables.m",
+                    line: 22,
+                    programArgs: [poison],
+                    cancellationToken: TestContext.Current.CancellationToken);
+
+                // The target fills the stack with the poison before the variables are declared, so they hold garbage.
+                var variables = await client.GetStackVariablesAsync(stoppedDetails.ThreadId!.Value, TestContext.Current.CancellationToken);
+
+                foreach (var name in new[] { "string", "dictionary", "array" })
+                {
+                    var variable = variables.Single(v => v.Name == name);
+                    Assert.False(string.IsNullOrEmpty(variable.Value));
+
+                    if (variable.VariablesReference > 0)
+                    {
+                        client.Host.SendRequestSync(new VariablesRequest() { VariablesReference = variable.VariablesReference });
+                    }
+                }
+
+                client.Host.SendRequestSync(new DisconnectRequest());
+
+                await task.WaitAsync(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            }
+        }
+
         private static EvaluateArguments.ContextValue ToContext(string context) => context switch
         {
             "hover" => EvaluateArguments.ContextValue.Hover,

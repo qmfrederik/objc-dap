@@ -139,6 +139,11 @@ namespace Objc.Dap.Runtime
 
         public Objc2Class ReadClass(nuint isa)
         {
+            if (isa == UIntPtr.Zero)
+            {
+                return Objc2Class.Null;
+            }
+
             // The objc_class layout is as follows:
             // struct objc_class
             // {
