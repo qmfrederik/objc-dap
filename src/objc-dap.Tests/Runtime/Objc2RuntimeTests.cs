@@ -681,27 +681,34 @@ namespace ObjcDap.Tests.Runtime
             var process = Process.Start(psi);
             Assert.NotNull(process);
 
-            var reader = ProcessMemoryReader.Create();
-            reader.Open(process.Id);
-
-            var runtime = new Objc2Runtime(
-                reader,
-                NullLogger<Objc2Runtime>.Instance);
-
             while (true)
             {
                 var line = process.StandardOutput.ReadLine();
 
-                if (line == null || line == "---")
+                if (line == null)
+                {
+                    Assert.Fail("The target process exited prematurely.  This is usually because of a crash or a missing shared library.");
+                }
+
+                if (line == "---")
                 {
                     break;
                 }
 
-                var parts = line.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-                var name = parts[0];
-                var address = ulong.Parse(parts[1].AsSpan(2), NumberStyles.HexNumber);
+                using (var reader = ProcessMemoryReader.Create())
+                {
+                    reader.Open(process.Id);
 
-                yield return (runtime, name, address);
+                    var runtime = new Objc2Runtime(
+                        reader,
+                        NullLogger<Objc2Runtime>.Instance);
+
+                    var parts = line.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+                    var name = parts[0];
+                    var address = ulong.Parse(parts[1].AsSpan(2), NumberStyles.HexNumber);
+
+                    yield return (runtime, name, address);
+                }
             }
         }
     }
