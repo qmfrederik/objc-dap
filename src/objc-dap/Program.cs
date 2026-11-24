@@ -1,9 +1,11 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Objc.Dap.Runtime;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 using System.Diagnostics;
+using System.IO.Abstractions;
 
 namespace Objc.Dap
 {
@@ -16,32 +18,8 @@ namespace Objc.Dap
         /// </summary>
         public static FileInfo DefaultLddbDapPath(ArgumentResult? argumentResult = null)
         {
-            string? environmentPath = Environment.GetEnvironmentVariable("LLDB_DAP_PATH");
-
-            if (environmentPath is not null)
-            {
-                return new FileInfo(environmentPath);
-            }
-
-            if (OperatingSystem.IsWindows())
-            {
-                var programFilesPath = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                    "LLVM",
-                    "bin",
-                    "lldb-dap.exe");
-
-                if (File.Exists(programFilesPath))
-                {
-                    return new FileInfo(programFilesPath);
-                }
-
-                return new FileInfo("lldb-dap.exe");
-            }
-            else
-            {
-                return new FileInfo("lldb-dap");
-            }
+            var locator = new LldbDapLocator(new FileSystem(), NullLogger<LldbDapLocator>.Instance);
+            return new FileInfo(locator.DefaultLldbDapPath().FullName);
         }
 
         /// <summary>

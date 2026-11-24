@@ -43,6 +43,23 @@ namespace Objc.Dap
 
                 return this.fileSystem.FileInfo.New("lldb-dap.exe");
             }
+            else if (OperatingSystem.IsLinux())
+            {
+                // If lldb-dap exists in /usr/bin, use that
+                if (this.fileSystem.File.Exists("/usr/bin/lldb-dap"))
+                {
+                    return this.fileSystem.FileInfo.New("/usr/bin/lldb-dap");   
+                }
+
+                // If a copy of lldb-dap with a specific version number suffix exists, use that
+                var files = this.fileSystem.Directory.GetFiles("/usr/bin", "lldb-dap-*");
+                if (files.Length > 0)
+                {
+                    return this.fileSystem.FileInfo.New(files[0]);
+                }
+
+                return this.fileSystem.FileInfo.New("lldb-dap");
+            }
             else
             {
                 return this.fileSystem.FileInfo.New("lldb-dap");

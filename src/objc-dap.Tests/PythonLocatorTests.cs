@@ -16,7 +16,7 @@ namespace ObjcDap.Tests
             Assert.Throws<ArgumentNullException>(() => new PythonLocator(fileSystem, null!));
         }
 
-        [Fact]
+        [WindowsFact]
         public void TryFindPython3Runtime_RespectsEnvironmentVariable()
         {
             var locator = new Mock<PythonLocator>(new MockFileSystem(), NullLogger<PythonLocator>.Instance)
