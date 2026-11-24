@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -17,9 +18,9 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("emptySet: 0x%p\n", emptySet);
-    printf("stringSet: 0x%p\n", stringSet);
-    printf("mutableSet: 0x%p\n", mutableSet);
+    PRINT_ADDRESS(emptySet);
+    PRINT_ADDRESS(stringSet);
+    PRINT_ADDRESS(mutableSet);
     printf("---\n");
 
     getchar();

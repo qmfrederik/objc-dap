@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 @interface Base : NSObject
 {
@@ -40,7 +41,7 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("derived: 0x%p\n", derived);
+    PRINT_ADDRESS(derived);
     printOffset("baseInt");
     printOffset("derivedDouble");
     printOffset("derivedString");

@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -39,18 +40,18 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("emptyString: 0x%p\n", emptyString);
-    printf("tinyString: 0x%p\n", tinyString);
-    printf("constantStringUTF7: 0x%p\n", constantStringUTF7);
-    printf("constantStringUnicode: 0x%p\n", constantStringUnicode);
-    printf("formattedString: 0x%p\n", formattedString);
-    printf("mutableString: 0x%p\n", mutableString);
-    printf("wideMutableString: 0x%p\n", wideMutableString);
-    printf("bufferString: 0x%p\n", bufferString);
-    printf("wideBufferString: 0x%p\n", wideBufferString);
-    printf("wideInlineString: 0x%p\n", wideInlineString);
-    printf("subString: 0x%p\n", subString);
-    printf("wideSubString: 0x%p\n", wideSubString);
+    PRINT_ADDRESS(emptyString);
+    PRINT_ADDRESS(tinyString);
+    PRINT_ADDRESS(constantStringUTF7);
+    PRINT_ADDRESS(constantStringUnicode);
+    PRINT_ADDRESS(formattedString);
+    PRINT_ADDRESS(mutableString);
+    PRINT_ADDRESS(wideMutableString);
+    PRINT_ADDRESS(bufferString);
+    PRINT_ADDRESS(wideBufferString);
+    PRINT_ADDRESS(wideInlineString);
+    PRINT_ADDRESS(subString);
+    PRINT_ADDRESS(wideSubString);
     printf("---\n");
 
     getchar();

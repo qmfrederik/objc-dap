@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -14,13 +15,13 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("objectClass: 0x%p\n", objectClass);
-    printf("stringClass: 0x%p\n", stringClass);
-    printf("arrayClass: 0x%p\n", arrayClass);
-    printf("metaClass: 0x%p\n", metaClass);
-    printf("nilClass: 0x%p\n", nilClass);
-    printf("object: 0x%p\n", object);
-    printf("otherMemory: 0x%p\n", otherMemory);
+    PRINT_ADDRESS(objectClass);
+    PRINT_ADDRESS(stringClass);
+    PRINT_ADDRESS(arrayClass);
+    PRINT_ADDRESS(metaClass);
+    PRINT_ADDRESS(nilClass);
+    PRINT_ADDRESS(object);
+    PRINT_ADDRESS(otherMemory);
     printf("---\n");
 
     getchar();

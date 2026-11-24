@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -15,12 +16,12 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("date: 0x%p\n", date);
-    printf("url: 0x%p\n", url);
-    printf("point: 0x%p\n", point);
-    printf("size: 0x%p\n", size);
-    printf("rect: 0x%p\n", rect);
-    printf("range: 0x%p\n", range);
+    PRINT_ADDRESS(date);
+    PRINT_ADDRESS(url);
+    PRINT_ADDRESS(point);
+    PRINT_ADDRESS(size);
+    PRINT_ADDRESS(rect);
+    PRINT_ADDRESS(range);
     printf("---\n");
 
     getchar();

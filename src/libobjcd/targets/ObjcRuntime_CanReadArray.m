@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -16,9 +17,9 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("emptyArray: 0x%p\n", emptyArray);
-    printf("stringArray: 0x%p\n", stringArray);
-    printf("mutableArray: 0x%p\n", mutableArray);
+    PRINT_ADDRESS(emptyArray);
+    PRINT_ADDRESS(stringArray);
+    PRINT_ADDRESS(mutableArray);
     printf("---\n");
 
     getchar();

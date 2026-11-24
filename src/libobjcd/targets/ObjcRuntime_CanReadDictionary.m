@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -17,9 +18,9 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("emptyDictionary: 0x%p\n", emptyDictionary);
-    printf("stringDictionary: 0x%p\n", stringDictionary);
-    printf("mutableDictionary: 0x%p\n", mutableDictionary);
+    PRINT_ADDRESS(emptyDictionary);
+    PRINT_ADDRESS(stringDictionary);
+    PRINT_ADDRESS(mutableDictionary);
     printf("---\n");
 
     getchar();
