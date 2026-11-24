@@ -12,6 +12,11 @@ namespace Objc.Dap
                 return new Win32ProcessMemoryReader();
             }
 
+            if (OperatingSystem.IsLinux())
+            {
+                return new LinuxProcessMemoryReader();
+            }
+
             throw new PlatformNotSupportedException("Process memory reading is not supported on this platform.");
         }
 
