@@ -1,0 +1,56 @@
+{
+    "configurations": [
+        {
+            "name": "Target (objc-dap)",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/libobjcd/build/targets/target",
+            "debugAdapterExecutable": "${workspaceFolder}/objc-dap/bin/x64/Debug/net10.0/objc-dap",
+            "windows": {
+                "program": "${workspaceFolder}/libobjcd/build/targets/target.exe",
+                "debugAdapterExecutable": "${workspaceFolder}/objc-dap/bin/x64/Debug/net10.0/objc-dap.exe"
+            },
+            "env": {
+                // "OBJC_DAP_BREAK_ON_START": "1"
+            }
+        },
+        {
+            "name": "Target (lldb-dap)",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/libobjcd/build/targets/target",
+            "windows": {
+                "program": "${workspaceFolder}/libobjcd/build/targets/target.exe"
+            },
+            "linux": {
+                "debugAdapterExecutable": "/usr/bin/lldb-dap-23",
+            }
+        },
+        {
+            "name": "Instance Variables (objc-dap)",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/libobjcd/build/targets/SimpleTarget_CanReadInstanceVariables",
+            "debugAdapterExecutable": "${workspaceFolder}/objc-dap/bin/x64/Debug/net10.0/objc-dap",
+            "windows": {
+                "program": "${workspaceFolder}/libobjcd/build/targets/SimpleTarget_CanReadInstanceVariables.exe",
+                "debugAdapterExecutable": "${workspaceFolder}/objc-dap/bin/x64/Debug/net10.0/objc-dap.exe"
+            },
+            "env": {
+                // "OBJC_DAP_BREAK_ON_START": "1"
+            }
+        },
+        {
+            "name": "Instance Variables (lldb-dap)",
+            "type": "lldb-dap",
+            "request": "launch",
+            "program": "${workspaceFolder}/libobjcd/build/targets/SimpleTarget_CanReadInstanceVariables",
+            "windows": {
+                "program": "${workspaceFolder}/libobjcd/build/targets/SimpleTarget_CanReadInstanceVariables.exe"
+            },
+            "linux": {
+                "debugAdapterExecutable": "/usr/bin/lldb-dap-23",
+            }
+        },
+    ]
+}
