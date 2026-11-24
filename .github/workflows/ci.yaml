@@ -145,11 +145,44 @@ jobs:
           .python3/bin/conan --version
           .python3/bin/conan remote add gitlab https://gitlab.com/api/v4/projects/72962159/packages/conan
         working-directory: src/libobjcd/
+      - name: Configure targets
+        run: |
+          cmake --preset release
+        working-directory: src/libobjcd
       - name: Build targets
         run: |
-          .python3/bin/conan install . -pr:a=../../conan-config/profiles/linux-clang-nodist -of=conan
-          mkdir build
-          cd build
-          cmake .. -DCMAKE_TOOLCHAIN_FILE=../conan/conan_toolchain.cmake  -DCMAKE_BUILD_TYPE=Release
-          cmake --build .
-        working-directory: src/libobjcd/
+          cmake --build build
+        working-directory: src/libobjcd
+      - name: Build objc-dap
+        run: |
+          dotnet restore
+          dotnet build
+        working-directory: src
+      - name: Show LLVM, Python 3 version data
+        run: |
+          dotnet run -- tool-version
+        working-directory: src/objc-dap
+      - name: Test objc-dap
+        run: |
+          dotnet test --output detailed
+        working-directory: src
+      - name: Publish objc-dap executable
+        run: |
+          dotnet publish -c Release
+          ./bin/Release/net10.0/linux-x64/publish/objc-dap --version
+        working-directory: src/objc-dap
+      - name: Publish objc-dap tarball
+        run: |
+          dotnet tool install --global dotnet-tarball
+          dotnet tarball -c Release -r linux-x64 -sc
+        working-directory: src/objc-dap
+      - name: Publish objc-dap executable
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: src/objc-dap/bin/Release/net10.0/linux-x64/publish/objc-dap
+      - name: Publish objc-dap zip archive
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: src/objc-dap/bin/Release/net10.0/linux-x64/objc-dap.*.tar.gz
