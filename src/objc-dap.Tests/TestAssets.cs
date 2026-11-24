@@ -4,11 +4,13 @@
     {
         public static string GetTargetPath(string name)
         {
+            var suffix = OperatingSystem.IsWindows() ? ".exe" : "";
+
             var path =
                 Path.GetFullPath(
                     Path.Combine(
                         GetSourceRoot(),
-                        $"libobjcd/build/targets/{name}.exe"));
+                        $"libobjcd/build/targets/{name}{suffix}"));
 
             if (!File.Exists(path))
             {
