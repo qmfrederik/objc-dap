@@ -124,12 +124,14 @@ namespace ObjcDap.Tests
                         Program = TestAssets.GetTargetPath(program),
                         ProgramArgs = programArgs,
                         StopOnEntry = false,
+                        // Prevents lldb from blocking on debuginfod lookups when the server is unreachable.
+                        InitCommands = new[] { "settings clear plugin.symbol-locator.debuginfod.server-urls" },
                     }
                 },
                 (a) => { },
                 cancellationToken: TestContext.Current.CancellationToken);
 
-            await initialized.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+            await initialized.WaitAsync(TimeSpan.FromSeconds(15), TestContext.Current.CancellationToken);
             var breakpointResponse = this.Host.SendRequestSync(
                 new SetBreakpointsRequest()
                 {

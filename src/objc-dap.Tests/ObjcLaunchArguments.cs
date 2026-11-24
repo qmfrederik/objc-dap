@@ -23,5 +23,11 @@ namespace ObjcDap.Tests
         /// </summary>
         [JsonProperty("stopOnEntry")]
         public bool StopOnEntry { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the LLDB commands to run before the target is created.
+        /// </summary>
+        [JsonProperty("initCommands", NullValueHandling = NullValueHandling.Ignore)]
+        public IReadOnlyList<string>? InitCommands { get; set; }
     }
 }
