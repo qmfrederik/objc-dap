@@ -123,11 +123,15 @@ namespace ObjcDap.Tests
                         VariablesReference = person.VariablesReference,
                     }).Variables;
 
-                var instanceVariables = client.Host.SendRequestSync(
-                    new VariablesRequest()
-                    {
-                        VariablesReference = members.Single(s => s.Name == "(anonymous)").VariablesReference,
-                    }).Variables;
+                // Depending on the platform, lldb nests the instance variables in an "(anonymous)" node or reports them directly.
+                var anonymous = members.SingleOrDefault(s => s.Name == "(anonymous)");
+                var instanceVariables = anonymous is null
+                    ? members
+                    : client.Host.SendRequestSync(
+                        new VariablesRequest()
+                        {
+                            VariablesReference = anonymous.VariablesReference,
+                        }).Variables;
 
                 var age = instanceVariables.Single(s => s.Name == "age");
                 Assert.Equal("int", age.Type);
