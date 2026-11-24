@@ -73,13 +73,23 @@ jobs:
         run: |
           dotnet test --output detailed
         working-directory: src
-      - name: Publish objc-dap
+      - name: Publish objc-dap executable
         run: |
           dotnet publish -c Release
           .\bin\Release\net10.0\win-x64\publish\objc-dap.exe --version
         working-directory: src/objc-dap
-      - name: Publish artifacts
+      - name: Publish objc-dap zip archive
+        run: |
+          dotnet tool install --global dotnet-zip
+          dotnet zip -c Release -r win-x64 -sc
+        working-directory: src/objc-dap
+      - name: Publish objc-dap executable
         uses: actions/upload-artifact@v7
         with:
-          name: objc-dap
+          archive: false
           path: src/objc-dap/bin/Release/net10.0/win-x64/publish/objc-dap.exe
+      - name: Publish objc-dap zip archive
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: src/objc-dap/bin/Release/net10.0/win-x64/objc-dap.*.zip
