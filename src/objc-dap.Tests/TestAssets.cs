@@ -34,18 +34,16 @@
 
         private static string GetSourceRoot()
         {
-            var source =
-                Path.GetFullPath(
-                    Path.Combine(
-                    Environment.CurrentDirectory,
-                    $"../../../../../"));
-
-            if (!File.Exists(Path.Combine(source, "global.json")))
+            // The output depth varies by platform (bin/x64/Debug/... vs. bin/Debug/...), so search upwards.
+            for (var directory = new DirectoryInfo(Environment.CurrentDirectory); directory is not null; directory = directory.Parent)
             {
-                throw new InvalidOperationException($"Could not find source root from {Environment.CurrentDirectory}");
+                if (File.Exists(Path.Combine(directory.FullName, "global.json")))
+                {
+                    return directory.FullName;
+                }
             }
 
-            return source;
+            throw new InvalidOperationException($"Could not find source root from {Environment.CurrentDirectory}");
         }
     }
 }
