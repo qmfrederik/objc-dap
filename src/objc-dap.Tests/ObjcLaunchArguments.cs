@@ -29,5 +29,11 @@ namespace ObjcDap.Tests
         /// </summary>
         [JsonProperty("initCommands", NullValueHandling = NullValueHandling.Ignore)]
         public IReadOnlyList<string>? InitCommands { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether lldb disables ASLR for the debuggee.
+        /// </summary>
+        [JsonProperty("disableASLR", NullValueHandling = NullValueHandling.Ignore)]
+        public bool? DisableAslr { get; set; }
     }
 }

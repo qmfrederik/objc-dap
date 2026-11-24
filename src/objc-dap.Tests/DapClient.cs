@@ -124,6 +124,9 @@ namespace ObjcDap.Tests
                         Program = TestAssets.GetTargetPath(program),
                         ProgramArgs = programArgs,
                         StopOnEntry = false,
+                        // Don't disable ASLR. Disabling it requires the
+                        // personality() syscall, which is blocked in the default Docker seccomp profile.
+                        DisableAslr = false,
                         // Prevents lldb from blocking on debuginfod lookups when the server is unreachable.
                         InitCommands = new[] { "settings clear plugin.symbol-locator.debuginfod.server-urls" },
                     }
