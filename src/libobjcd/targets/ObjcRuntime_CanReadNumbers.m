@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -23,16 +24,16 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("smallInt: 0x%p\n", smallInt);
-    printf("smallFloat: 0x%p\n", smallFloat);
-    printf("smallRepeatingDouble: 0x%p\n", smallRepeatingDouble);
-    printf("smallExtendedDouble: 0x%p\n", smallExtendedDouble);
-    printf("boolNumber: 0x%p\n", boolNumber);
-    printf("reusedInt: 0x%p\n", reusedInt);
-    printf("intNumber: 0x%p\n", intNumber);
-    printf("longLongNumber: 0x%p\n", longLongNumber);
-    printf("unsignedLongLongNumber: 0x%p\n", unsignedLongLongNumber);
-    printf("doubleNumber: 0x%p\n", doubleNumber);
+    PRINT_ADDRESS(smallInt);
+    PRINT_ADDRESS(smallFloat);
+    PRINT_ADDRESS(smallRepeatingDouble);
+    PRINT_ADDRESS(smallExtendedDouble);
+    PRINT_ADDRESS(boolNumber);
+    PRINT_ADDRESS(reusedInt);
+    PRINT_ADDRESS(intNumber);
+    PRINT_ADDRESS(longLongNumber);
+    PRINT_ADDRESS(unsignedLongLongNumber);
+    PRINT_ADDRESS(doubleNumber);
     printf("---\n");
 
     getchar();

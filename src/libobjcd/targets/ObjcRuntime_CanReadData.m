@@ -1,4 +1,5 @@
 #include <Foundation/Foundation.h>
+#include "common.h"
 
 int main()
 {
@@ -22,13 +23,13 @@ int main()
     // Unbuffered so output appears immediately when stdout is a pipe.
     setvbuf(stdout, NULL, _IONBF, 0);
 
-    printf("emptyData: 0x%p\n", emptyData);
-    printf("staticData: 0x%p\n", staticData);
-    printf("smallData: 0x%p\n", smallData);
-    printf("exactPreviewData: 0x%p\n", exactPreviewData);
-    printf("largeData: 0x%p\n", largeData);
-    printf("mutableData: 0x%p\n", mutableData);
-    printf("emptyMutableData: 0x%p\n", emptyMutableData);
+    PRINT_ADDRESS(emptyData);
+    PRINT_ADDRESS(staticData);
+    PRINT_ADDRESS(smallData);
+    PRINT_ADDRESS(exactPreviewData);
+    PRINT_ADDRESS(largeData);
+    PRINT_ADDRESS(mutableData);
+    PRINT_ADDRESS(emptyMutableData);
     printf("---\n");
 
     getchar();
