@@ -46,7 +46,7 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/dotnet/sdk:10.0
+      image: mcr.microsoft.com/dotnet/sdk:10.0-aot
     permissions:
       contents: write
     steps:
