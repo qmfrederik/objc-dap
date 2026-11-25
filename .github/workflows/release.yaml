@@ -42,3 +42,42 @@ jobs:
             publish/objc-dap.exe
             objc-dap.*.zip
           working_directory: src/objc-dap/bin/Release/net10.0/win-x64/
+
+  linux:
+    runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/dotnet/sdk:10.0
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build objc-dap
+        run: |
+          dotnet restore
+          dotnet build
+        working-directory: src
+      - name: Publish objc-dap executable
+        run: |
+          dotnet publish -c Release
+          ./bin/Release/net10.0/linux-x64/publish/objc-dap --version
+        working-directory: src/objc-dap
+      - name: Publish objc-dap zip archive
+        run: |
+          dotnet tool install --global dotnet-tarball
+          dotnet tarball -c Release -r linux-x64 -sc
+        working-directory: src/objc-dap
+      - name: Publish artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: objc-dap
+          path: src/objc-dap/bin/Release/net10.0/linux-x64/publish/objc-dap
+      - name: Release
+        uses: softprops/action-gh-release@v3
+        if: github.ref_type == 'tag'
+        with:
+          files: |
+            publish/objc-dap
+            objc-dap.*.tar.gz
+          working_directory: src/objc-dap/bin/Release/net10.0/linux-x64/
