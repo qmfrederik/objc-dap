@@ -63,9 +63,10 @@ jobs:
           dotnet publish -c Release
           ./bin/Release/net10.0/linux-x64/publish/objc-dap --version
         working-directory: src/objc-dap
-      - name: Publish objc-dap zip archive
+      - name: Publish objc-dap tarball
         run: |
           dotnet tool install --global dotnet-tarball
+          export PATH="$PATH:$HOME/.dotnet/tools"
           dotnet tarball -c Release -r linux-x64 -sc
         working-directory: src/objc-dap
       - name: Publish artifacts
