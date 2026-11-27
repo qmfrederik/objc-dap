@@ -1,4 +1,6 @@
-﻿namespace Objc.Dap
+﻿using Microsoft.Extensions.Logging;
+
+namespace Objc.Dap
 {
     public class DebugAdapterOptions
     {
@@ -27,5 +29,16 @@
         /// variables for the debug adapter process.
         /// </summary>
         public FileInfo? Python3Library { get; set; }
+
+        /// <summary>
+        /// Gets or sets the path of the file to which log messages are appended.  If <see langword="null"/>,
+        /// no log file is written.
+        /// </summary>
+        public FileInfo? LogFile { get; set; }
+
+        /// <summary>
+        /// Gets or sets the minimum level of the messages which are logged.
+        /// </summary>
+        public LogLevel LogLevel { get; set; } = LogLevel.Information;
     }
 }

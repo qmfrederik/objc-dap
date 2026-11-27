@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NReco.Logging.File;
 using Objc.Dap.Runtime;
 using System.CommandLine;
 using System.CommandLine.Parsing;
@@ -77,8 +78,23 @@ namespace Objc.Dap
                 Arity = ArgumentArity.ZeroOrOne,
             };
 
+            var logFileOption = new Option<FileInfo?>("--log-file")
+            {
+                Description = "Path of a file to which log messages are appended. If not set, no log file is written.",
+                Arity = ArgumentArity.ExactlyOne,
+            };
+
+            var logLevelOption = new Option<LogLevel>("--log-level")
+            {
+                Description = "Minimum level of the messages written to the log file.",
+                Arity = ArgumentArity.ExactlyOne,
+                DefaultValueFactory = _ => LogLevel.Information,
+            };
+
             rootCommand.Options.Add(lldbDapPathOption);
             rootCommand.Options.Add(breakOption);
+            rootCommand.Options.Add(logFileOption);
+            rootCommand.Options.Add(logLevelOption);
             rootCommand.SetAction(RunAsync);
 
             rootCommand.Add(ToolVersionCommand());
@@ -105,6 +121,8 @@ namespace Objc.Dap
                     Output = Console.OpenStandardOutput(),
                     Error = Console.OpenStandardError(),
                     Python3Library = TryFindPyton3Library(),
+                    LogFile = parseResult.GetValue<FileInfo?>("--log-file"),
+                    LogLevel = parseResult.GetValue<LogLevel>("--log-level"),
                 },
                 cancellationToken);
         }
@@ -112,7 +130,20 @@ namespace Objc.Dap
         public static async Task<int> RunAsync(DebugAdapterOptions options, CancellationToken cancellationToken)
         {
             ServiceCollection services = new ServiceCollection();
-            services.AddLogging(l => l.AddDebug());
+            services.AddLogging(l =>
+            {
+                l.SetMinimumLevel(options.LogLevel);
+                l.AddDebug();
+
+                if (options.LogFile is not null)
+                {
+                    l.AddFile(options.LogFile.FullName, fileOptions =>
+                    {
+                        fileOptions.Append = false;
+                        fileOptions.MinLevel = options.LogLevel;
+                    });
+                }
+            });
             services.AddSingleton(options);
             services.AddSingleton(ProcessMemoryReader.Create());
             services.AddSingleton<Objc2Runtime>();
@@ -121,8 +152,19 @@ namespace Objc.Dap
 
             using var provider = services.BuildServiceProvider();
             var proxy = provider.GetRequiredService<DebugAdapterProxy>();
-            await proxy.RunAsync(cancellationToken);
-            return 0;
+            var logger = provider.GetRequiredService<ILogger<Program>>();
+
+            try
+            {
+                await proxy.RunAsync(cancellationToken);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"An error occurred while running the debug adapter: {ex.Message}.");
+                Console.Error.WriteLine(ex);
+                return 1;
+            }
         }
     }
 }
