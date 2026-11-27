@@ -112,6 +112,7 @@ namespace ObjcDap.Tests
                     AdapterID = "objc-dap",
                     LinesStartAt1 = true,
                     ColumnsStartAt1 = true,
+                    PathFormat = InitializeArguments.PathFormatValue.Path,
                 });
 
             // Launch the debugger.
