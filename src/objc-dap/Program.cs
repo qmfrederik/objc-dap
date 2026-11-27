@@ -152,8 +152,19 @@ namespace Objc.Dap
 
             using var provider = services.BuildServiceProvider();
             var proxy = provider.GetRequiredService<DebugAdapterProxy>();
-            await proxy.RunAsync(cancellationToken);
-            return 0;
+            var logger = provider.GetRequiredService<ILogger<Program>>();
+
+            try
+            {
+                await proxy.RunAsync(cancellationToken);
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, $"An error occurred while running the debug adapter: {ex.Message}.");
+                Console.Error.WriteLine(ex);
+                return 1;
+            }
         }
     }
 }
