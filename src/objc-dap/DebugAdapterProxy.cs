@@ -75,19 +75,31 @@ namespace Objc.Dap
             var process = Process.Start(startInfo)
                 ?? throw new InvalidOperationException($"Failed to start {startInfo.FileName}.");
 
+            this.logger.LogInformation("Started {FileName} with process ID {ProcessId}.", startInfo.FileName, process.Id);
+
             return RunLoopAsync(process, cancellationToken);
         }
 
         private async Task RunLoopAsync(Process process, CancellationToken cancellationToken)
         {
-            await Task.WhenAny(
-                this.DapProxyLoopAsync(this.options.Input, this.serverQueue, cancellationToken),
-                this.DapProxyLoopAsync(this.serverQueue, process.StandardInput.BaseStream, cancellationToken),
-                this.DapProxyLoopAsync(process.StandardOutput.BaseStream, this.clientQueue, cancellationToken),
-                this.DapProxyLoopAsync(this.clientQueue, this.options.Output, cancellationToken),
-                process.StandardError.BaseStream.CopyToAsync(this.options.Error, cancellationToken));
-
-            process.Kill(entireProcessTree: true);
+            try
+            {
+                await Task.WhenAny(
+                    this.DapProxyLoopAsync(this.options.Input, this.serverQueue, cancellationToken),
+                    this.DapProxyLoopAsync(this.serverQueue, process.StandardInput.BaseStream, cancellationToken),
+                    this.DapProxyLoopAsync(process.StandardOutput.BaseStream, this.clientQueue, cancellationToken),
+                    this.DapProxyLoopAsync(this.clientQueue, this.options.Output, cancellationToken),
+                    process.StandardError.BaseStream.CopyToAsync(this.options.Error, cancellationToken));
+            }
+            catch (Exception ex)
+            {
+                this.logger.LogError(ex, $"An error occurred in the DAP proxy loop: {ex.Message}.");
+                throw;
+            }
+            finally
+            {
+                process.Kill(entireProcessTree: true);
+            }
         }
 
         private async Task DapProxyLoopAsync(AsyncQueue<Message?> queue, Stream target, CancellationToken cancellationToken)
