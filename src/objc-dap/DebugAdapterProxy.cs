@@ -18,6 +18,11 @@ namespace Objc.Dap
         private readonly ILogger<DebugAdapterProxy> logger;
         private readonly MemoryPool<byte> memoryPool = MemoryPool<byte>.Shared;
 
+        private const string ClientToProxy = "client -> proxy";
+        private const string ProxyToLldb = "proxy -> lldb-dap";
+        private const string LldbToProxy = "lldb-dap -> proxy";
+        private const string ProxyToClient = "proxy -> client";
+
         // Messages which are about to be proxied are stored on these queues, allowing multiple threads to post
         // messages in parallel.
         private readonly AsyncQueue<Message?> serverQueue = new AsyncQueue<Message?>();
@@ -85,10 +90,10 @@ namespace Objc.Dap
             try
             {
                 await Task.WhenAny(
-                    this.DapProxyLoopAsync(this.options.Input, this.serverQueue, cancellationToken),
-                    this.DapProxyLoopAsync(this.serverQueue, process.StandardInput.BaseStream, cancellationToken),
-                    this.DapProxyLoopAsync(process.StandardOutput.BaseStream, this.clientQueue, cancellationToken),
-                    this.DapProxyLoopAsync(this.clientQueue, this.options.Output, cancellationToken),
+                    this.DapProxyLoopAsync(this.options.Input, this.serverQueue, ClientToProxy, cancellationToken),
+                    this.DapProxyLoopAsync(this.serverQueue, process.StandardInput.BaseStream, ProxyToLldb, cancellationToken),
+                    this.DapProxyLoopAsync(process.StandardOutput.BaseStream, this.clientQueue, LldbToProxy, cancellationToken),
+                    this.DapProxyLoopAsync(this.clientQueue, this.options.Output, ProxyToClient, cancellationToken),
                     process.StandardError.BaseStream.CopyToAsync(this.options.Error, cancellationToken));
             }
             catch (Exception ex)
@@ -102,14 +107,34 @@ namespace Objc.Dap
             }
         }
 
-        private async Task DapProxyLoopAsync(AsyncQueue<Message?> queue, Stream target, CancellationToken cancellationToken)
+        private async Task DapProxyLoopAsync(AsyncQueue<Message?> queue, Stream target, string direction, CancellationToken cancellationToken)
         {
             Message? message;
 
             while ((message = await queue.DequeueAsync(cancellationToken)) != null)
             {
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                {
+                    // Skip the Content-Length header.
+                    var headerLength = message.Value.Span.IndexOf("\r\n\r\n"u8) + 4;
+                    this.TraceMessage(direction, new ReadOnlySequence<byte>(message.Value.Slice(headerLength)));
+                }
+
                 await target.WriteAsync(message.Value, cancellationToken);
                 message.Dispose();
+            }
+        }
+
+        // Logs a summary of the message at the Debug level, and the full message at the Trace level.
+        private void TraceMessage(string direction, ReadOnlySequence<byte> body)
+        {
+            if (this.logger.IsEnabled(LogLevel.Trace))
+            {
+                this.logger.LogTrace("{Direction}: {Summary} {Body}", direction, MessageSummary.Describe(body), Encoding.UTF8.GetString(body));
+            }
+            else if (this.logger.IsEnabled(LogLevel.Debug))
+            {
+                this.logger.LogDebug("{Direction}: {Summary}", direction, MessageSummary.Describe(body));
             }
         }
 
@@ -117,7 +142,7 @@ namespace Objc.Dap
         /// advances the reader as messages are consumed.
         /// <remarks>Expects DAP framing with a single Content-Length header, followed by \r\n\r\n and a
         /// UTF-8 JSON payload.</remarks>Stream that provides incoming protocol data.Stream intended to receive proxied protocol data.Token that cancels pending reads and stops the loop.A task that completes when the source stream is completed or cancellation is requested.
-        private async Task DapProxyLoopAsync(Stream source, AsyncQueue<Message?> target, CancellationToken cancellationToken)
+        private async Task DapProxyLoopAsync(Stream source, AsyncQueue<Message?> target, string direction, CancellationToken cancellationToken)
         {
             var reader = PipeReader.Create(source);
 
@@ -155,6 +180,8 @@ namespace Objc.Dap
                     {
                         var message = buffer.Slice(header.Length + 4, length);
                         var messageWithHeader = buffer.Slice(0, header.Length + 4 + length);
+
+                        this.TraceMessage(direction, message);
 
                         var jsonReader = new Utf8JsonReader(message);
                         var value = JsonSerializer.Deserialize(ref jsonReader, DebugAdapterSerializerContext.Default.ProtocolMessage)!;
