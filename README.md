@@ -10,7 +10,7 @@ The Objective-C Debug Adapter assumes you are using [libobjc2](https://github.co
 
 The [tutorial project](https://github.com/qmfrederik/conan-gnustep/tree/main/tutorial) can help you get started building an Objective-C application on Windows or Linux, using [Conan](https://conan.io/) and [CMake](https://cmake.org/).
 
-[VS Code](https://code.visualstudio.com/) brings a modern Objective-C editing experience on Windows and Linux.  You can use [clangd](https://github.com/clangd/vscode-clangd) for Objective-C code completion, syntax highlighting and more.
+[VS Code](https://code.visualstudio.com/) brings a modern Objective-C editing experience on Windows and Linux.  You can use [clangd](https://github.com/clangd/vscode-clangd) for Objective-C code completion, syntax highlighting and more.  The Objective-C Debug Adapter should work with any code editor that supports the Debug Adapter Protocol, including CLion.
 
 ### Download objc-dap
 To download and install objc-dap:
@@ -53,6 +53,10 @@ python3.dll: C:\Users\username\AppData\Local\Python\pythoncore-3.15-64\python3.d
 ```
 
 All set!  You can now run and debug your Objective-C application.
+
+## Tips & Tricks
+
+On Ubuntu Linux, you may find that the Debug Adapter takes about a minute to 90 seconds to start.  This appears to be because LLDP will try to download debug symbols from https://debuginfod.ubuntu.com/, which is slow or unresponsive.  If this is the case, please clear the `DEBUGINFOD_URLS` environment variable, which is set by default, and try again.
 
 ## How it works
 
